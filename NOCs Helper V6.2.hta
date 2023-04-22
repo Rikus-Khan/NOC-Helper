@@ -1,0 +1,2977 @@
+<HTML>
+<HEAD>
+<HTA:Application
+ Border = "thick"
+ BorderStyle = "Complex"
+ ContextMenu = "No"
+ Icon = "Velocity.bmp">
+
+    <style>
+
+        .bDefault {color:Black}
+        .tDefault {color:Black}
+        .oDefault {color:Black}
+
+        .bRed {color:Red; background-color: Black;}
+        .tRed {color:Red; background-color: darkgrey; border-color: lightgrey;}
+        .oRed {color:Red; background-color: darkgrey; border-color: lightgrey;}
+
+        .bPrincess {color:Purple; background-color: Black; border-color: plum;}
+        .tPrincess {color:Purple; background-color: Plum; border-color: Plum;}
+        .oPrincess {color:Purple; background-color: Plum; border-color: Plum;}
+
+        .bGreen {color:Chartreuse; background-color: Black;}
+        .tGreen {color:Chartreuse; background-color: darkgrey; border-color: lightgrey;}
+        .oGreen {color:Chartreuse; background-color: darkgrey; border-color: lightgrey;}
+
+        .bfont {font-weight: bold}
+
+        fieldset {border: 2px outset; border-radius: 8px;}
+
+        body {overflow: hidden;}
+
+        .wrapper {position: relative;}
+
+        #Tab1 {
+        position: absolute;
+        top: 0;
+        right: 0;
+        padding: 10px 10px;
+        }        
+        #Tab2 {
+        position: absolute;
+        top: 0;
+        right: 0;
+        padding: 10px 10px;
+        }  
+        #Tab3 {
+        position: absolute;
+        top: 0;
+        right: 0;
+        padding: 10px 10px;
+        }
+        #Tab4 {
+        position: absolute;
+        top: 0;
+        right: 0;
+        padding: 10px 10px;
+        }  
+    </style>
+</head>
+
+<SCRIPT LANGUAGE="VBScript">
+'********************************************************************
+'* Global Variables
+'********************************************************************   
+  Dim LinesNeeded, strUseField, strIP, CurrentTab, strColor1, strColor2, strColor3, strColor4, strColor5, strColor6, CSVArray(1000,3), IPLines, txtTheme, xPing, xRadwin, txtColor
+'********************************************************************
+
+'********************************************************************
+'* Window_Onload
+'********************************************************************
+Sub Window_Onload
+    self.Focus()
+    self.ResizeTo 500,450
+    document.title = "NOC's Little Friend V6.2 - < Author: Rick Stewart >"
+    document.body.bgcolor="Silver"
+    txtTheme = "Default"
+    CustReset()
+    MPReset()
+    OpenTab1()
+
+  '***************
+  'The following lines read the IP file into memory.
+  '***************
+    
+  'Set FileName to read IP info from
+  csvfile = "IPRange.txt"
+
+  'Prepare file system
+  Set objFSO = CreateObject("Scripting.FileSystemObject")
+
+  'Count the lines in the csvfile
+  Set theFile = objFSO.OpenTextFile(csvfile, 8, True) 
+  IPLines = theFile.Line
+
+  'txtIP.value = IPLines
+
+  'Open CSV file
+  Set objFile = objFSO.OpenTextFile(csvfile)
+
+  i = 0
+
+  'Loop through each line of the file until the end.
+  Do While objFile.AtEndOfStream <> True
+    'This "splits" the line into another array creating a multi-Dimensional array.
+    'CSVArray(0,0) will be everything before the first comma on the first row = Monopole
+    'CSVArray(1,1) will be everything between the first and second commas on the second row = Layer
+    'CSVArray(0,2) will be everything between the second and third commas on the first row = Sector
+    'CSVArray(1,3) will be everything after the third comma on the second row = IP Address
+
+    'This line will read one line of the CSV file and store it in LineArray.
+    ' However, the Split command separates the values so that LineArray(0) gets the values before the first "," and so on.
+    LineArray = Split(objFile.ReadLine, ",")
+    For x = 0 to 3
+      CSVArray(i,x) = LineArray(x)
+    Next
+    i = i + 1
+  Loop
+
+  'Memory wipe to free space
+  Set objFSO = Nothing
+
+  '***************
+  'The above lines read the IP file into memory.
+  '***************
+End Sub
+
+'********************************************************************
+'* CustReset - This clears the values of the Customer text boxes.
+'********************************************************************
+Sub CustReset
+  txtCustLat.value = ""
+  txtCustLon.value = ""
+  txtCustHeight.value = "(in meters)"
+  OptionChoosera.disabled = true
+  OptionChooserb.disabled = true
+  OptionChooserc.disabled = true
+  OptionChooserd.disabled = true
+  btnCoordsSave.disabled = true
+End Sub
+
+'********************************************************************
+'* MPReset - This clears the values of the Customer text boxes.
+'********************************************************************
+Sub MPReset
+  OptionChoosera.selectedIndex = "0"
+  MPChangeda()
+  OptionChooserb.selectedIndex = "0"
+  MPChangedb()
+  OptionChooserc.selectedIndex = "0"
+  MPChangedc()
+  OptionChooserd.selectedIndex = "0"
+  MPChangedd()
+  btnCoordsSave.disabled = true
+End Sub
+
+'********************************************************************
+'* CustChange - Activates the first dropdown when all three customer fields have info.
+'********************************************************************
+Sub CustChange
+  If Len(txtCustLat.value & vbNullString) = 0 OR Len(txtCustLon.value & vbNullString) = 0 OR Len(txtCustHeight.value & vbNullString) = 0 Then
+    'All Customer fields are empty, disable the MonoPole Selections
+    OptionChoosera.disabled = true
+    OptionChooserb.disabled = true
+    OptionChooserc.disabled = true
+    OptionChooserd.disabled = true
+    btnCoordsSave.disabled = true
+  Else
+    OptionChoosera.disabled = false
+    btnCoordsSave.disabled = false
+  End If
+End Sub
+
+'********************************************************************
+'* NewCoordsSave() - This subroutine will output a KML file.
+'*  The purpose is to draw line of sight from points to a point.
+'********************************************************************
+Sub NewCoordsSave()
+
+  'The below is a loop which checks all conditions and calls the appropriate subroutine to write the file.
+  ' ***There is no error checking other than blank values.***
+  If Len(txtCustLat.value & vbNullString) = 0 OR Len(txtCustLon.value & vbNullString) = 0 OR Len(txtCustHeight.value & vbNullString) = 0 Then
+    'Send error for Customers Info
+    MsgBox("Check Customers Info.")
+
+  ElseIf Len(txtaMPLat.value & vbNullString) = 0 OR Len(txtaMPLon.value & vbNullString) = 0 OR Len(txtaMPHeight.value & vbNullString) = 0 Then
+    'Send error for First MonoPoles Info
+    MsgBox("Check First MonoPole Info.")
+
+  ElseIf Len(txtbMPLat.value & vbNullString) = 0 OR Len(txtbMPLon.value & vbNullString) = 0 OR Len(txtbMPHeight.value & vbNullString) = 0 Then
+    'Goto Write One Lines
+    LinesNeeded = 1
+    NewWriteLines()
+
+  ElseIf Len(txtcMPLat.value & vbNullString) = 0 OR Len(txtcMPLon.value & vbNullString) = 0 OR Len(txtcMPHeight.value & vbNullString) = 0 Then
+    'Goto Write Two Lines
+    LinesNeeded = 2
+    NewWriteLines()
+
+  ElseIf Len(txtdMPLat.value & vbNullString) = 0 OR Len(txtdMPLon.value & vbNullString) = 0 OR Len(txtdMPHeight.value & vbNullString) = 0 Then
+    'Goto Write Three Lines
+    LinesNeeded = 3
+    NewWriteLines()
+
+  Else 
+    'Goto Write Four Lines
+    LinesNeeded = 4
+    NewWriteLines()
+
+  End If
+End Sub
+
+'********************************************************************
+'* NewWriteLines
+'*  This subroutine will create a new KML file for Google Earth.
+'********************************************************************
+Sub NewWriteLines
+
+  'Filename of the New KML File.
+  strFile = "LoS.kml"
+
+  'KML formating
+  ' This file was broken down into sections as there appeared to be a limit
+  ' to the number of characters which could be written per line.
+  ' The last line of each section stores each line of the KML file.
+  strLine1 = "<?xml version=""1.0"" encoding=""UTF-8""?>"
+  strLine2 = vbCrLf & "<kml xmlns=""http://www.opengis.net/kml/2.2"" xmlns:gx=""http://www.google.com/kml/ext/2.2"" xmlns:kml=""http://www.opengis.net/kml/2.2"" xmlns:atom=""http://www.w3.org/2005/Atom"">"
+  strLine3 = vbCrLf & "<Document>"
+  strLine4 = vbCrLf & vbTab & "<name>LoS.kml</name>"
+  strLine5 = vbCrLf & vbTab & "<Style id=""inline"">"
+  strLine6 = vbCrLf & vbTab & vbTab & "<LineStyle>"
+  strLine7 = vbCrLf & vbTab & vbTab & vbTab & "<color>ff0000ff</color>"
+  strLine8 = vbCrLf & vbTab & vbTab & vbTab & "<width>2</width>"
+  strLine9 = vbCrLf & vbTab & vbTab & "</LineStyle>"
+  strLine10 = vbCrLf & vbTab & "</Style>"
+  strHeader1 = strLine1 & strLine2 & strLine3 & strLine4 & strLine5 & strLine6 & strLine7 & strLine8 & strLine9 & strLine10
+  
+  strLine1 = vbTab & "<Style id=""inline0"">"
+  strLine2 = vbCrLf & vbTab & vbTab & "<LineStyle>"
+  strLine3 = vbCrLf & vbTab & vbTab & vbTab & "<color>ff0000ff</color>"
+  strLine4 = vbCrLf & vbTab & vbTab & vbTab & "<width>2</width>"
+  strLine5 = vbCrLf & vbTab & vbTab & "</LineStyle>"
+  strLine6 = vbCrLf & vbTab & "</Style>"
+  strLine7 = vbCrLf & vbTab & "<StyleMap id=""inline1"">"
+  strLine8 = vbCrLf & vbTab & vbTab & "<Pair>"
+  strLine9 = vbCrLf & vbTab & vbTab & vbTab & "<key>normal</key>"
+  strLine10 = vbCrLf & vbTab & vbTab & vbTab & "<styleUrl>#inline0</styleUrl>"
+  strHeader2 = strLine1 & strLine2 & strLine3 & strLine4 & strLine5 & strLine6 & strLine7 & strLine8 & strLine9 & strLine10
+
+  strLine1 = vbTab & vbTab & "</Pair>"
+  strLine2 = vbCrLf & vbTab & vbTab & "<Pair>"
+  strLine3 = vbCrLf & vbTab & vbTab & vbTab & "<key>highlight</key>"
+  strLine4 = vbCrLf & vbTab & vbTab & vbTab & "<styleUrl>#inline</styleUrl>"
+  strLine5 = vbCrLf & vbTab & vbTab & "</Pair>"
+  strLine6 = vbCrLf & vbTab & "</StyleMap>"
+  strLine7 = vbCrLf & vbTab & "<Placemark>"
+  strLine8 =  vbCrLf & vbTab & vbTab & "<name>Line Measure</name>"
+  strLine9 = vbCrLf & vbTab & vbTab & "<styleUrl>#inline1</styleUrl>"
+  strLine10 = vbCrLf & vbTab & vbTab & "<LineString>"
+  strLine11 =  vbCrLf & vbTab & vbTab & vbTab & "<extrude>1</extrude>"
+  strLine12 = vbCrLf & vbTab & vbTab & vbTab & "<tessellate>1</tessellate>"
+  strLine13 = vbCrLf & vbTab & vbTab & vbTab & "<altitudeMode>relativeToGround</altitudeMode>"
+  strLine14 = vbCrLf & vbTab & vbTab & vbTab & "<coordinates>"
+  strHeader3 = strLine1 & strLine2 & strLine3 & strLine4 & strLine5 & strLine6 & strLine7 & strLine8 & strLine9 & strLine10 & strLine11 & strLine12 & strLine13 & strLine14
+
+  strLine1 = vbTab & vbTab & vbTab & "</coordinates>"
+  strLine2 = vbCrLf & vbTab & vbTab & "</LineString>"
+  strLine3 = vbCrLf & vbTab & "</Placemark>"
+  strLine4 = vbCrLf & "</Document>"
+  strLine5 = vbCrLf & "</kml>"
+  strFooter = strLine1 & strLine2 & strLine3 & strLine4 & strLine5
+
+  strSCoords = vbCrLf & vbTab & vbTab & vbTab & "</coordinates>"
+  strSLineString = vbCrLf & vbTab & vbTab & "</LineString>"
+  strSPlacemark = vbCrLf & vbTab & "</Placemark>"
+  strPlacemark = vbCrLf & vbTab & "<Placemark>"
+  strName =  vbCrLf & vbTab & vbTab & "<name>Line Measure</name>"
+  strStyle = vbCrLf & vbTab & vbTab & "<styleUrl>#inline1</styleUrl>"
+  strLineString = vbCrLf & vbTab & vbTab & "<LineString>"
+  strExtrude =  vbCrLf & vbTab & vbTab & vbTab & "<extrude>1</extrude>"
+  strTessellate = vbCrLf & vbTab & vbTab & vbTab & "<tessellate>1</tessellate>"
+  strAltitudeMode = vbCrLf & vbTab & vbTab & vbTab & "<altitudeMode>relativeToGround</altitudeMode>"
+  strCoords = vbCrLf & vbTab & vbTab & vbTab & "<coordinates>"
+  strFormat = strSCoords & strSLineString & strSPlacemark & strPlacemark & strName & strStyle & strLineString & strExtrude & strTessellate & strAltitudeMode & strCoords & vbCrLf
+
+  'String to add to the KML. It requires the TAB spacing and gets data from the HTML textbox elements which start with "txt"
+  strFirstLine = vbTab & vbTab & vbTab & vbTab & txtaMPLon.value & "," & txtaMPLat.value & "," & txtaMPHeight.value & " " & txtCustLon.value & "," & txtCustLat.value & "," & txtCustHeight.value
+  strSecondLine = strFormat & vbTab & vbTab & vbTab & vbTab & txtbMPLon.value & "," & txtbMPLat.value & "," & txtbMPHeight.value & " " & txtCustLon.value & "," & txtCustLat.value & "," & txtCustHeight.value
+  strThirdLine = strFormat & vbTab & vbTab & vbTab & vbTab & txtcMPLon.value & "," & txtcMPLat.value & "," & txtcMPHeight.value & " " & txtCustLon.value & "," & txtCustLat.value & "," & txtCustHeight.value
+  strFourthLine =  strFormat & vbTab & vbTab & vbTab & vbTab & txtdMPLon.value & "," & txtdMPLat.value & "," & txtdMPHeight.value & " " & txtCustLon.value & "," & txtCustLat.value & "," & txtCustHeight.value
+ 
+  'Set variable to long function name.
+  Set objFSO = CreateObject("Scripting.FileSystemObject")
+
+  'Open temporary file for writing - Options are: (FileName, Open For Writing, Create New If Not Found).
+  Set objTemp = objFSO.OpenTextFile(strFile, 2, True)
+  
+  'Write the headers to start the file
+  objTemp.WriteLine strHeader1
+  objTemp.WriteLine strHeader2
+  objTemp.WriteLine strHeader3
+
+  If LinesNeeded = 1 Then
+
+    objTemp.WriteLine strFirstLine
+    objTemp.WriteLine strFooter
+
+    'Close the file
+    objTemp.Close
+
+    MsgBox("1 Lines Written.")    
+  ElseIf LinesNeeded = 2 Then
+    objTemp.WriteLine strFirstLine & strSecondLine
+    objTemp.WriteLine strFooter
+
+    'Close the file
+    objTemp.Close
+
+    MsgBox("2 Lines Written.")    
+  ElseIf LinesNeeded = 3 Then
+    objTemp.WriteLine strFirstLine & strSecondLine & strThirdLine
+    objTemp.WriteLine strFooter
+
+    'Close the file
+    objTemp.Close
+
+    MsgBox("3 Lines Written.")    
+  Else
+    objTemp.WriteLine strFirstLine & strSecondLine & strThirdLine & strFourthLine
+    objTemp.WriteLine strFooter
+    
+    'Close the file
+    objTemp.Close
+
+    MsgBox("4 Lines Written.")    
+  End If  
+End Sub
+
+'********************************************************************
+'* MPChangeda - This subroutine checks for the dropdown list to change.
+'*  When it does change, it assigns values to the fields next to it.
+'********************************************************************
+Sub MPChangeda
+  OptionChooserb.disabled = false
+  For Each objOption in OptionChoosera.Options
+    If objOption.Selected Then
+      Select Case objOption.InnerText
+        Case "Select a MP"
+          txtaMPLat.value = ""
+          txtaMPLon.value = ""
+          txtaMPHeight.value = ""
+          OptionChooserb.disabled = true
+        Case "MP1"
+          txtaMPLat.value = "37.621907"
+          txtaMPLon.value = "-97.138265"
+          txtaMPHeight.value = "40"
+        Case "MP2"
+          txtaMPLat.value = "37.640269"
+          txtaMPLon.value = "-97.205134"
+          txtaMPHeight.value = "31"
+        Case "MP3"
+          txtaMPLat.value = "37.619459"
+          txtaMPLon.value = "-97.189555"
+          txtaMPHeight.value = "31"
+        Case "MP4"
+          txtaMPLat.value = "37.621484"
+          txtaMPLon.value = "-97.031991"
+          txtaMPHeight.value = "31"
+        Case "MP5"
+          txtaMPLat.value = "37.548696"
+          txtaMPLon.value = "-97.032387"
+          txtaMPHeight.value = "31"
+        Case "MP6"
+          txtaMPLat.value = "37.592339"
+          txtaMPLon.value = "-97.078094"
+          txtaMPHeight.value = "31"
+        Case "MP7"
+          txtaMPLat.value = "37.562897"
+          txtaMPLon.value = "-97.154270"
+          txtaMPHeight.value = "31"
+        Case "MP8"
+          txtaMPLat.value = "37.519147"
+          txtaMPLon.value = "-97.217560"
+          txtaMPHeight.value = "31"
+        Case "MP9"
+          txtaMPLat.value = "37.537104"
+          txtaMPLon.value = "-97.208051"
+          txtaMPHeight.value = "31"
+        Case "MP10"
+          txtaMPLat.value = "37.484701"
+          txtaMPLon.value = "-97.135183"
+          txtaMPHeight.value = "31"
+        Case "MP11"
+          txtaMPLat.value = "37.5196"
+          txtaMPLon.value = "-97.0381"
+          txtaMPHeight.value = "31"
+        Case "MP12"
+          txtaMPLat.value = "37.519490"
+          txtaMPLon.value = "-96.933376"
+          txtaMPHeight.value = "31"
+        Case "MP13"
+          txtaMPLat.value = "37.588987"
+          txtaMPLon.value = "-96.980869"
+          txtaMPHeight.value = "31"
+        Case "MP14"
+          txtaMPLat.value = "37.585080"
+          txtaMPLon.value = "-96.899171"
+          txtaMPHeight.value = "31"
+        Case "MP15"
+          txtaMPLat.value = "37.578107"
+          txtaMPLon.value = "-96.935453"
+          txtaMPHeight.value = "31"
+        Case "MP16"
+          txtaMPLat.value = "37.670314"
+          txtaMPLon.value = "-96.917020"
+          txtaMPHeight.value = "31"
+        Case "MP17"
+          txtaMPLat.value = "37.693982"
+          txtaMPLon.value = "-96.860312"
+          txtaMPHeight.value = "31"
+        Case "MP18"
+          txtaMPLat.value = "37.735701"
+          txtaMPLon.value = "-96.880348"
+          txtaMPHeight.value = "31"
+        Case "MP19"
+          txtaMPLat.value = "37.766589"
+          txtaMPLon.value = "-96.734292"
+          txtaMPHeight.value = "31"
+        Case "MP20"
+          txtaMPLat.value = "37.721254"
+          txtaMPLon.value = "-96.716013"
+          txtaMPHeight.value = "31"
+        Case "MP21"
+          txtaMPLat.value = "37.693994"
+          txtaMPLon.value = "-96.800952"
+          txtaMPHeight.value = "31"
+        Case "MP23"
+          txtaMPLat.value = "37.737665"
+          txtaMPLon.value = "-96.956315"
+          txtaMPHeight.value = "31"
+        Case "MP24"
+          txtaMPLat.value = "37.766444"
+          txtaMPLon.value = "-96.948270"
+          txtaMPHeight.value = "31"
+        Case "MP25"
+          txtaMPLat.value = "37.781190"
+          txtaMPLon.value = "-97.002861"
+          txtaMPHeight.value = "31"
+        Case "MP26"
+          txtaMPLat.value = "37.766952"
+          txtaMPLon.value = "-97.079402"
+          txtaMPHeight.value = "31"
+        Case "MP27"
+          txtaMPLat.value = "37.75246"
+          txtaMPLon.value = "-97.18677"
+          txtaMPHeight.value = "31"
+        Case "MP28"
+          txtaMPLat.value = "37.832409"
+          txtaMPLon.value = "-97.152349"
+          txtaMPHeight.value = "31"
+        Case "MP29"
+          txtaMPLat.value = "37.868881"
+          txtaMPLon.value = "-97.096208"
+          txtaMPHeight.value = "31"
+        Case "MP30"
+          txtaMPLat.value = "37.854281"
+          txtaMPLon.value = "-96.987901"
+          txtaMPHeight.value = "31"
+        Case "MP31"
+          txtaMPLat.value = "37.650274"
+          txtaMPLon.value = "-97.109693"
+          txtaMPHeight.value = "31"
+        Case "MP32"
+          txtaMPLat.value = "37.686883"
+          txtaMPLon.value = "-97.098477"
+          txtaMPHeight.value = "31"
+        Case "MP33"
+          txtaMPLat.value = "37.708656"
+          txtaMPLon.value = "-97.092318"
+          txtaMPHeight.value = "31"
+        Case "MP34"
+          txtaMPLat.value = "37.695664"
+          txtaMPLon.value = "-97.061914"
+          txtaMPHeight.value = "31"
+        Case "MP35"
+          txtaMPLat.value = "37.528511"
+          txtaMPLon.value = "-97.098709"
+          txtaMPHeight.value = "31"
+        Case "MP36"
+          txtaMPLat.value = "37.840322"
+          txtaMPLon.value = "-97.239604"
+          txtaMPHeight.value = "31"
+        Case "MP37"
+          txtaMPLat.value = "37.878764"
+          txtaMPLon.value = "-97.214274"
+          txtaMPHeight.value = "31"
+        Case "MP38"
+          txtaMPLat.value = "37.910355"
+          txtaMPLon.value = "-97.299790"
+          txtaMPHeight.value = "31"
+        Case "MP39"
+          txtaMPLat.value = "37.998028"
+          txtaMPLon.value = "-97.299999"
+          txtaMPHeight.value = "31"
+        Case "MP40"
+          txtaMPLat.value = "38.055349"
+          txtaMPLon.value = "-97.300017"
+          txtaMPHeight.value = "31"
+        Case "MP41"
+          txtaMPLat.value = "38.072160"
+          txtaMPLon.value = "-97.245094"
+          txtaMPHeight.value = "31"
+        Case "MP42"
+          txtaMPLat.value = "38.086915"
+          txtaMPLon.value = "-97.196320"
+          txtaMPHeight.value = "31"
+        Case "MP31"
+          txtaMPLat.value = "38.031841"
+          txtaMPLon.value = "-97.139496"
+          txtaMPHeight.value = "31"
+        Case "MP44"
+          txtaMPLat.value = "38.013167"
+          txtaMPLon.value = "-97.209249"
+          txtaMPHeight.value = "31"
+        Case "MP45"
+          txtaMPLat.value = "37.980123"
+          txtaMPLon.value = "-97.152852"
+          txtaMPHeight.value = "31"
+        Case "MP46"
+          txtaMPLat.value = "37.941293"
+          txtaMPLon.value = "-97.201055"
+          txtaMPHeight.value = "31"
+        Case "MP47"
+          txtaMPLat.value = "37.954974"
+          txtaMPLon.value = "-97.115815"
+          txtaMPHeight.value = "31"
+        Case "MP48"
+          txtaMPLat.value = "37.960763"
+          txtaMPLon.value = "-97.024251"
+          txtaMPHeight.value = "31"
+        Case "MP49"
+          txtaMPLat.value = "37.737869"
+          txtaMPLon.value = "-97.133504"
+          txtaMPHeight.value = "31"
+        Case "MP50"
+          txtaMPLat.value = "37.781503"
+          txtaMPLon.value = "-97.152149"
+          txtaMPHeight.value = "31"
+        Case "MP51"
+          txtaMPLat.value = "37.803413"
+          txtaMPLon.value = "-97.061499"
+          txtaMPHeight.value = "31"
+        Case "MP52"
+          txtaMPLat.value = "37.752334"
+          txtaMPLon.value = "-97.057063"
+          txtaMPHeight.value = "31"
+        Case "MP54"
+          txtaMPLat.value = "38.014182"
+          txtaMPLon.value = "-97.071298"
+          txtaMPHeight.value = "31"
+        Case "MP55"
+          txtaMPLat.value = "38.065698"
+          txtaMPLon.value = "-97.116296"
+          txtaMPHeight.value = "31"
+        Case "MP56"
+          txtaMPLat.value = "38.071955"
+          txtaMPLon.value = "-97.047099"
+          txtaMPHeight.value = "31"
+        Case "MP57"
+          txtaMPLat.value = "38.045955"
+          txtaMPLon.value = "-96.968825"
+          txtaMPHeight.value = "31"
+        Case "MP58"
+          txtaMPLat.value = "37.929282"
+          txtaMPLon.value = "-96.969123"
+          txtaMPHeight.value = "31"
+        Case "MP59"
+          txtaMPLat.value = "37.89739"
+          txtaMPLon.value = "-96.9558"
+          txtaMPHeight.value = "31"
+        Case "MP60"
+          txtaMPLat.value = "37.647153"
+          txtaMPLon.value = "-96.980660"
+          txtaMPHeight.value = "31"
+        Case "MP61"
+          txtaMPLat.value = "37.533187"
+          txtaMPLon.value = "-96.871105"
+          txtaMPHeight.value = "31"
+        Case "MP62"
+          txtaMPLat.value = "37.563200"
+          txtaMPLon.value = "-96.808188"
+          txtaMPHeight.value = "31"
+        Case "MP63"
+          txtaMPLat.value = "37.650325"
+          txtaMPLon.value = "-96.857170"
+          txtaMPHeight.value = "31"
+        Case "MP64"
+          txtaMPLat.value = "37.768644"
+          txtaMPLon.value = "-96.661555"
+          txtaMPHeight.value = "31"
+        Case "MP65"
+          txtaMPLat.value = "37.852586"
+          txtaMPLon.value = "-96.675600"
+          txtaMPHeight.value = "31"
+        Case "MP66"
+          txtaMPLat.value = "37.839306"
+          txtaMPLon.value = "-96.7633"
+          txtaMPHeight.value = "31"
+        Case "MP67"
+          txtaMPLat.value = "37.926557"
+          txtaMPLon.value = "-96.752313"
+          txtaMPHeight.value = "31"
+        Case "MP69"
+          txtaMPLat.value = "38.042539"
+          txtaMPLon.value = "-96.786401"
+          txtaMPHeight.value = "31"
+        Case "MP71"
+          txtaMPLat.value = "37.9182"
+          txtaMPLon.value = "-96.849211"
+          txtaMPHeight.value = "31"
+        Case "MP72"
+          txtaMPLat.value = "37.984193"
+          txtaMPLon.value = "-96.950800"
+          txtaMPHeight.value = "31"
+        Case "MP73"
+          txtaMPLat.value = "38.071074"
+          txtaMPLon.value = "-96.872800"
+          txtaMPHeight.value = "31"
+        Case "MP74"
+          txtaMPLat.value = "37.985195"
+          txtaMPLon.value = "-96.859497"
+          txtaMPHeight.value = "31"
+        Case "MP75"
+          txtaMPLat.value = "37.676026"
+          txtaMPLon.value = "-96.634207"
+          txtaMPHeight.value = "31"
+        Case "MP76"
+          txtaMPLat.value = "37.578004"
+          txtaMPLon.value = "-96.644073"
+          txtaMPHeight.value = "31"
+        Case "MP77"
+          txtaMPLat.value = "37.664659"
+          txtaMPLon.value = "-96.740693"
+          txtaMPHeight.value = "31"
+        Case "MP80"
+          txtaMPLat.value = "37.815182"
+          txtaMPLon.value = "-96.847778"
+          txtaMPHeight.value = "50"
+        Case "MP81"
+          txtaMPLat.value = "37.514147"
+          txtaMPLon.value = "-97.010606"
+          txtaMPHeight.value = "38"
+        Case "MP82"
+          txtaMPLat.value = "37.518425"
+          txtaMPLon.value = "-97.009819"
+          txtaMPHeight.value = "38"
+      End Select
+    End If
+  Next
+End Sub
+
+'********************************************************************
+'* MPChangedb - This subroutine checks for the dropdown list to change.
+'*  When it does change, it assigns values to the fields next to it.
+'********************************************************************
+Sub MPChangedb
+  OptionChooserc.disabled = false
+  For Each objOption in OptionChooserb.Options
+    If objOption.Selected Then
+      Select Case objOption.InnerText
+        Case "Select a MP"
+          txtbMPLat.value = ""
+          txtbMPLon.value = ""
+          txtbMPHeight.value = ""
+          OptionChooserc.disabled = true
+        Case "MP1"
+          txtbMPLat.value = "37.621907"
+          txtbMPLon.value = "-97.138265"
+          txtbMPHeight.value = "40"
+        Case "MP2"
+          txtbMPLat.value = "37.640269"
+          txtbMPLon.value = "-97.205134"
+          txtbMPHeight.value = "31"
+        Case "MP3"
+          txtbMPLat.value = "37.619459"
+          txtbMPLon.value = "-97.189555"
+          txtbMPHeight.value = "31"
+        Case "MP4"
+          txtbMPLat.value = "37.621484"
+          txtbMPLon.value = "-97.031991"
+          txtbMPHeight.value = "31"
+        Case "MP5"
+          txtbMPLat.value = "37.548696"
+          txtbMPLon.value = "-97.032387"
+          txtbMPHeight.value = "31"
+        Case "MP6"
+          txtbMPLat.value = "37.592339"
+          txtbMPLon.value = "-97.078094"
+          txtbMPHeight.value = "31"
+        Case "MP7"
+          txtbMPLat.value = "37.562897"
+          txtbMPLon.value = "-97.154270"
+          txtbMPHeight.value = "31"
+        Case "MP8"
+          txtbMPLat.value = "37.519147"
+          txtbMPLon.value = "-97.217560"
+          txtbMPHeight.value = "31"
+        Case "MP9"
+          txtbMPLat.value = "37.537104"
+          txtbMPLon.value = "-97.208051"
+          txtbMPHeight.value = "31"
+        Case "MP10"
+          txtbMPLat.value = "37.484701"
+          txtbMPLon.value = "-97.135183"
+          txtbMPHeight.value = "31"
+        Case "MP11"
+          txtbMPLat.value = "37.5196"
+          txtbMPLon.value = "-97.0381"
+          txtbMPHeight.value = "31"
+        Case "MP12"
+          txtbMPLat.value = "37.519490"
+          txtbMPLon.value = "-96.933376"
+          txtbMPHeight.value = "31"
+        Case "MP13"
+          txtbMPLat.value = "37.588987"
+          txtbMPLon.value = "-96.980869"
+          txtbMPHeight.value = "31"
+        Case "MP14"
+          txtbMPLat.value = "37.585080"
+          txtbMPLon.value = "-96.899171"
+          txtbMPHeight.value = "31"
+        Case "MP15"
+          txtbMPLat.value = "37.578107"
+          txtbMPLon.value = "-96.935453"
+          txtbMPHeight.value = "31"
+        Case "MP16"
+          txtbMPLat.value = "37.670314"
+          txtbMPLon.value = "-96.917020"
+          txtbMPHeight.value = "31"
+        Case "MP17"
+          txtbMPLat.value = "37.693982"
+          txtbMPLon.value = "-96.860312"
+          txtbMPHeight.value = "31"
+        Case "MP18"
+          txtbMPLat.value = "37.735701"
+          txtbMPLon.value = "-96.880348"
+          txtbMPHeight.value = "31"
+        Case "MP19"
+          txtbMPLat.value = "37.766589"
+          txtbMPLon.value = "-96.734292"
+          txtbMPHeight.value = "31"
+        Case "MP20"
+          txtbMPLat.value = "37.721254"
+          txtbMPLon.value = "-96.716013"
+          txtbMPHeight.value = "31"
+        Case "MP21"
+          txtbMPLat.value = "37.693994"
+          txtbMPLon.value = "-96.800952"
+          txtbMPHeight.value = "31"
+        Case "MP23"
+          txtbMPLat.value = "37.737665"
+          txtbMPLon.value = "-96.956315"
+          txtbMPHeight.value = "31"
+        Case "MP24"
+          txtbMPLat.value = "37.766444"
+          txtbMPLon.value = "-96.948270"
+          txtbMPHeight.value = "31"
+        Case "MP25"
+          txtbMPLat.value = "37.781190"
+          txtbMPLon.value = "-97.002861"
+          txtbMPHeight.value = "31"
+        Case "MP26"
+          txtbMPLat.value = "37.766952"
+          txtbMPLon.value = "-97.079402"
+          txtbMPHeight.value = "31"
+        Case "MP27"
+          txtbMPLat.value = "37.75246"
+          txtbMPLon.value = "-97.18677"
+          txtbMPHeight.value = "31"
+        Case "MP28"
+          txtbMPLat.value = "37.832409"
+          txtbMPLon.value = "-97.152349"
+          txtbMPHeight.value = "31"
+        Case "MP29"
+          txtbMPLat.value = "37.868881"
+          txtbMPLon.value = "-97.096208"
+          txtbMPHeight.value = "31"
+        Case "MP30"
+          txtbMPLat.value = "37.854281"
+          txtbMPLon.value = "-96.987901"
+          txtbMPHeight.value = "31"
+        Case "MP31"
+          txtbMPLat.value = "37.650274"
+          txtbMPLon.value = "-97.109693"
+          txtbMPHeight.value = "31"
+        Case "MP32"
+          txtbMPLat.value = "37.686883"
+          txtbMPLon.value = "-97.098477"
+          txtbMPHeight.value = "31"
+        Case "MP33"
+          txtbMPLat.value = "37.708656"
+          txtbMPLon.value = "-97.092318"
+          txtbMPHeight.value = "31"
+        Case "MP34"
+          txtbMPLat.value = "37.695664"
+          txtbMPLon.value = "-97.061914"
+          txtbMPHeight.value = "31"
+        Case "MP35"
+          txtbMPLat.value = "37.528511"
+          txtbMPLon.value = "-97.098709"
+          txtbMPHeight.value = "31"
+        Case "MP36"
+          txtbMPLat.value = "37.840322"
+          txtbMPLon.value = "-97.239604"
+          txtbMPHeight.value = "31"
+        Case "MP37"
+          txtbMPLat.value = "37.878764"
+          txtbMPLon.value = "-97.214274"
+          txtbMPHeight.value = "31"
+        Case "MP38"
+          txtbMPLat.value = "37.910355"
+          txtbMPLon.value = "-97.299790"
+          txtbMPHeight.value = "31"
+        Case "MP39"
+          txtbMPLat.value = "37.998028"
+          txtbMPLon.value = "-97.299999"
+          txtbMPHeight.value = "31"
+        Case "MP40"
+          txtbMPLat.value = "38.055349"
+          txtbMPLon.value = "-97.300017"
+          txtbMPHeight.value = "31"
+        Case "MP41"
+          txtbMPLat.value = "38.072160"
+          txtbMPLon.value = "-97.245094"
+          txtbMPHeight.value = "31"
+        Case "MP42"
+          txtbMPLat.value = "38.086915"
+          txtbMPLon.value = "-97.196320"
+          txtbMPHeight.value = "31"
+        Case "MP31"
+          txtbMPLat.value = "38.031841"
+          txtbMPLon.value = "-97.139496"
+          txtbMPHeight.value = "31"
+        Case "MP44"
+          txtbMPLat.value = "38.013167"
+          txtbMPLon.value = "-97.209249"
+          txtbMPHeight.value = "31"
+        Case "MP45"
+          txtbMPLat.value = "37.980123"
+          txtbMPLon.value = "-97.152852"
+          txtbMPHeight.value = "31"
+        Case "MP46"
+          txtbMPLat.value = "37.941293"
+          txtbMPLon.value = "-97.201055"
+          txtbMPHeight.value = "31"
+        Case "MP47"
+          txtbMPLat.value = "37.954974"
+          txtbMPLon.value = "-97.115815"
+          txtbMPHeight.value = "31"
+        Case "MP48"
+          txtbMPLat.value = "37.960763"
+          txtbMPLon.value = "-97.024251"
+          txtbMPHeight.value = "31"
+        Case "MP49"
+          txtbMPLat.value = "37.737869"
+          txtbMPLon.value = "-97.133504"
+          txtbMPHeight.value = "31"
+        Case "MP50"
+          txtbMPLat.value = "37.781503"
+          txtbMPLon.value = "-97.152149"
+          txtbMPHeight.value = "31"
+        Case "MP51"
+          txtbMPLat.value = "37.803413"
+          txtbMPLon.value = "-97.061499"
+          txtbMPHeight.value = "31"
+        Case "MP52"
+          txtbMPLat.value = "37.752334"
+          txtbMPLon.value = "-97.057063"
+          txtbMPHeight.value = "31"
+        Case "MP54"
+          txtbMPLat.value = "38.014182"
+          txtbMPLon.value = "-97.071298"
+          txtbMPHeight.value = "31"
+        Case "MP55"
+          txtbMPLat.value = "38.065698"
+          txtbMPLon.value = "-97.116296"
+          txtbMPHeight.value = "31"
+        Case "MP56"
+          txtbMPLat.value = "38.071955"
+          txtbMPLon.value = "-97.047099"
+          txtbMPHeight.value = "31"
+        Case "MP57"
+          txtbMPLat.value = "38.045955"
+          txtbMPLon.value = "-96.968825"
+          txtbMPHeight.value = "31"
+        Case "MP58"
+          txtbMPLat.value = "37.929282"
+          txtbMPLon.value = "-96.969123"
+          txtbMPHeight.value = "31"
+        Case "MP59"
+          txtbMPLat.value = "37.89739"
+          txtbMPLon.value = "-96.9558"
+          txtbMPHeight.value = "31"
+        Case "MP60"
+          txtbMPLat.value = "37.647153"
+          txtbMPLon.value = "-96.980660"
+          txtbMPHeight.value = "31"
+        Case "MP61"
+          txtbMPLat.value = "37.533187"
+          txtbMPLon.value = "-96.871105"
+          txtbMPHeight.value = "31"
+        Case "MP62"
+          txtbMPLat.value = "37.563200"
+          txtbMPLon.value = "-96.808188"
+          txtbMPHeight.value = "31"
+        Case "MP63"
+          txtbMPLat.value = "37.650325"
+          txtbMPLon.value = "-96.857170"
+          txtbMPHeight.value = "31"
+        Case "MP64"
+          txtbMPLat.value = "37.768644"
+          txtbMPLon.value = "-96.661555"
+          txtbMPHeight.value = "31"
+        Case "MP65"
+          txtbMPLat.value = "37.852586"
+          txtbMPLon.value = "-96.675600"
+          txtbMPHeight.value = "31"
+        Case "MP66"
+          txtbMPLat.value = "37.839306"
+          txtbMPLon.value = "-96.7633"
+          txtbMPHeight.value = "31"
+        Case "MP67"
+          txtbMPLat.value = "37.926557"
+          txtbMPLon.value = "-96.752313"
+          txtbMPHeight.value = "31"
+        Case "MP69"
+          txtbMPLat.value = "38.042539"
+          txtbMPLon.value = "-96.786401"
+          txtbMPHeight.value = "31"
+        Case "MP71"
+          txtbMPLat.value = "37.9182"
+          txtbMPLon.value = "-96.849211"
+          txtbMPHeight.value = "31"
+        Case "MP72"
+          txtbMPLat.value = "37.984193"
+          txtbMPLon.value = "-96.950800"
+          txtbMPHeight.value = "31"
+        Case "MP73"
+          txtbMPLat.value = "38.071074"
+          txtbMPLon.value = "-96.872800"
+          txtbMPHeight.value = "31"
+        Case "MP74"
+          txtbMPLat.value = "37.985195"
+          txtbMPLon.value = "-96.859497"
+          txtbMPHeight.value = "31"
+        Case "MP75"
+          txtbMPLat.value = "37.676026"
+          txtbMPLon.value = "-96.634207"
+          txtbMPHeight.value = "31"
+        Case "MP76"
+          txtbMPLat.value = "37.578004"
+          txtbMPLon.value = "-96.644073"
+          txtbMPHeight.value = "31"
+        Case "MP77"
+          txtbMPLat.value = "37.664659"
+          txtbMPLon.value = "-96.740693"
+          txtbMPHeight.value = "31"
+        Case "MP80"
+          txtbMPLat.value = "37.815182"
+          txtbMPLon.value = "-96.847778"
+          txtbMPHeight.value = "50"
+        Case "MP81"
+          txtbMPLat.value = "37.514147"
+          txtbMPLon.value = "-97.010606"
+          txtbMPHeight.value = "38"
+        Case "MP82"
+          txtbMPLat.value = "37.518425"
+          txtbMPLon.value = "-97.009819"
+          txtbMPHeight.value = "38"
+      End Select
+    End If
+  Next
+End Sub
+
+'********************************************************************
+'* MPChangedc - This subroutine checks for the dropdown list to change.
+'*  When it does change, it assigns values to the fields next to it.
+'********************************************************************
+Sub MPChangedc
+  OptionChooserd.disabled = false
+  For Each objOption in OptionChooserc.Options
+    If objOption.Selected Then
+      Select Case objOption.InnerText
+        Case "Select a MP"
+          txtcMPLat.value = ""
+          txtcMPLon.value = ""
+          txtcMPHeight.value = ""
+          OptionChooserd.disabled = true
+        Case "MP1"
+          txtcMPLat.value = "37.621907"
+          txtcMPLon.value = "-97.138265"
+          txtcMPHeight.value = "40"
+        Case "MP2"
+          txtcMPLat.value = "37.640269"
+          txtcMPLon.value = "-97.205134"
+          txtcMPHeight.value = "31"
+        Case "MP3"
+          txtcMPLat.value = "37.619459"
+          txtcMPLon.value = "-97.189555"
+          txtcMPHeight.value = "31"
+        Case "MP4"
+          txtcMPLat.value = "37.621484"
+          txtcMPLon.value = "-97.031991"
+          txtcMPHeight.value = "31"
+        Case "MP5"
+          txtcMPLat.value = "37.548696"
+          txtcMPLon.value = "-97.032387"
+          txtcMPHeight.value = "31"
+        Case "MP6"
+          txtcMPLat.value = "37.592339"
+          txtcMPLon.value = "-97.078094"
+          txtcMPHeight.value = "31"
+        Case "MP7"
+          txtcMPLat.value = "37.562897"
+          txtcMPLon.value = "-97.154270"
+          txtcMPHeight.value = "31"
+        Case "MP8"
+          txtcMPLat.value = "37.519147"
+          txtcMPLon.value = "-97.217560"
+          txtcMPHeight.value = "31"
+        Case "MP9"
+          txtcMPLat.value = "37.537104"
+          txtcMPLon.value = "-97.208051"
+          txtcMPHeight.value = "31"
+        Case "MP10"
+          txtcMPLat.value = "37.484701"
+          txtcMPLon.value = "-97.135183"
+          txtcMPHeight.value = "31"
+        Case "MP11"
+          txtcMPLat.value = "37.5196"
+          txtcMPLon.value = "-97.0381"
+          txtcMPHeight.value = "31"
+        Case "MP12"
+          txtcMPLat.value = "37.519490"
+          txtcMPLon.value = "-96.933376"
+          txtcMPHeight.value = "31"
+        Case "MP13"
+          txtcMPLat.value = "37.588987"
+          txtcMPLon.value = "-96.980869"
+          txtcMPHeight.value = "31"
+        Case "MP14"
+          txtcMPLat.value = "37.585080"
+          txtcMPLon.value = "-96.899171"
+          txtcMPHeight.value = "31"
+        Case "MP15"
+          txtcMPLat.value = "37.578107"
+          txtcMPLon.value = "-96.935453"
+          txtcMPHeight.value = "31"
+        Case "MP16"
+          txtcMPLat.value = "37.670314"
+          txtcMPLon.value = "-96.917020"
+          txtcMPHeight.value = "31"
+        Case "MP17"
+          txtcMPLat.value = "37.693982"
+          txtcMPLon.value = "-96.860312"
+          txtcMPHeight.value = "31"
+        Case "MP18"
+          txtcMPLat.value = "37.735701"
+          txtcMPLon.value = "-96.880348"
+          txtcMPHeight.value = "31"
+        Case "MP19"
+          txtcMPLat.value = "37.766589"
+          txtcMPLon.value = "-96.734292"
+          txtcMPHeight.value = "31"
+        Case "MP20"
+          txtcMPLat.value = "37.721254"
+          txtcMPLon.value = "-96.716013"
+          txtcMPHeight.value = "31"
+        Case "MP21"
+          txtcMPLat.value = "37.693994"
+          txtcMPLon.value = "-96.800952"
+          txtcMPHeight.value = "31"
+        Case "MP23"
+          txtcMPLat.value = "37.737665"
+          txtcMPLon.value = "-96.956315"
+          txtcMPHeight.value = "31"
+        Case "MP24"
+          txtcMPLat.value = "37.766444"
+          txtcMPLon.value = "-96.948270"
+          txtcMPHeight.value = "31"
+        Case "MP25"
+          txtcMPLat.value = "37.781190"
+          txtcMPLon.value = "-97.002861"
+          txtcMPHeight.value = "31"
+        Case "MP26"
+          txtcMPLat.value = "37.766952"
+          txtcMPLon.value = "-97.079402"
+          txtcMPHeight.value = "31"
+        Case "MP27"
+          txtcMPLat.value = "37.75246"
+          txtcMPLon.value = "-97.18677"
+          txtcMPHeight.value = "31"
+        Case "MP28"
+          txtcMPLat.value = "37.832409"
+          txtcMPLon.value = "-97.152349"
+          txtcMPHeight.value = "31"
+        Case "MP29"
+          txtcMPLat.value = "37.868881"
+          txtcMPLon.value = "-97.096208"
+          txtcMPHeight.value = "31"
+        Case "MP30"
+          txtcMPLat.value = "37.854281"
+          txtcMPLon.value = "-96.987901"
+          txtcMPHeight.value = "31"
+        Case "MP31"
+          txtcMPLat.value = "37.650274"
+          txtcMPLon.value = "-97.109693"
+          txtcMPHeight.value = "31"
+        Case "MP32"
+          txtcMPLat.value = "37.686883"
+          txtcMPLon.value = "-97.098477"
+          txtcMPHeight.value = "31"
+        Case "MP33"
+          txtcMPLat.value = "37.708656"
+          txtcMPLon.value = "-97.092318"
+          txtcMPHeight.value = "31"
+        Case "MP34"
+          txtcMPLat.value = "37.695664"
+          txtcMPLon.value = "-97.061914"
+          txtcMPHeight.value = "31"
+        Case "MP35"
+          txtcMPLat.value = "37.528511"
+          txtcMPLon.value = "-97.098709"
+          txtcMPHeight.value = "31"
+        Case "MP36"
+          txtcMPLat.value = "37.840322"
+          txtcMPLon.value = "-97.239604"
+          txtcMPHeight.value = "31"
+        Case "MP37"
+          txtcMPLat.value = "37.878764"
+          txtcMPLon.value = "-97.214274"
+          txtcMPHeight.value = "31"
+        Case "MP38"
+          txtcMPLat.value = "37.910355"
+          txtcMPLon.value = "-97.299790"
+          txtcMPHeight.value = "31"
+        Case "MP39"
+          txtcMPLat.value = "37.998028"
+          txtcMPLon.value = "-97.299999"
+          txtcMPHeight.value = "31"
+        Case "MP40"
+          txtcMPLat.value = "38.055349"
+          txtcMPLon.value = "-97.300017"
+          txtcMPHeight.value = "31"
+        Case "MP41"
+          txtcMPLat.value = "38.072160"
+          txtcMPLon.value = "-97.245094"
+          txtcMPHeight.value = "31"
+        Case "MP42"
+          txtcMPLat.value = "38.086915"
+          txtcMPLon.value = "-97.196320"
+          txtcMPHeight.value = "31"
+        Case "MP31"
+          txtcMPLat.value = "38.031841"
+          txtcMPLon.value = "-97.139496"
+          txtcMPHeight.value = "31"
+        Case "MP44"
+          txtcMPLat.value = "38.013167"
+          txtcMPLon.value = "-97.209249"
+          txtcMPHeight.value = "31"
+        Case "MP45"
+          txtcMPLat.value = "37.980123"
+          txtcMPLon.value = "-97.152852"
+          txtcMPHeight.value = "31"
+        Case "MP46"
+          txtcMPLat.value = "37.941293"
+          txtcMPLon.value = "-97.201055"
+          txtcMPHeight.value = "31"
+        Case "MP47"
+          txtcMPLat.value = "37.954974"
+          txtcMPLon.value = "-97.115815"
+          txtcMPHeight.value = "31"
+        Case "MP48"
+          txtcMPLat.value = "37.960763"
+          txtcMPLon.value = "-97.024251"
+          txtcMPHeight.value = "31"
+        Case "MP49"
+          txtcMPLat.value = "37.737869"
+          txtcMPLon.value = "-97.133504"
+          txtcMPHeight.value = "31"
+        Case "MP50"
+          txtcMPLat.value = "37.781503"
+          txtcMPLon.value = "-97.152149"
+          txtcMPHeight.value = "31"
+        Case "MP51"
+          txtcMPLat.value = "37.803413"
+          txtcMPLon.value = "-97.061499"
+          txtcMPHeight.value = "31"
+        Case "MP52"
+          txtcMPLat.value = "37.752334"
+          txtcMPLon.value = "-97.057063"
+          txtcMPHeight.value = "31"
+        Case "MP54"
+          txtcMPLat.value = "38.014182"
+          txtcMPLon.value = "-97.071298"
+          txtcMPHeight.value = "31"
+        Case "MP55"
+          txtcMPLat.value = "38.065698"
+          txtcMPLon.value = "-97.116296"
+          txtcMPHeight.value = "31"
+        Case "MP56"
+          txtcMPLat.value = "38.071955"
+          txtcMPLon.value = "-97.047099"
+          txtcMPHeight.value = "31"
+        Case "MP57"
+          txtcMPLat.value = "38.045955"
+          txtcMPLon.value = "-96.968825"
+          txtcMPHeight.value = "31"
+        Case "MP58"
+          txtcMPLat.value = "37.929282"
+          txtcMPLon.value = "-96.969123"
+          txtcMPHeight.value = "31"
+        Case "MP59"
+          txtcMPLat.value = "37.89739"
+          txtcMPLon.value = "-96.9558"
+          txtcMPHeight.value = "31"
+        Case "MP60"
+          txtcMPLat.value = "37.647153"
+          txtcMPLon.value = "-96.980660"
+          txtcMPHeight.value = "31"
+        Case "MP61"
+          txtcMPLat.value = "37.533187"
+          txtcMPLon.value = "-96.871105"
+          txtcMPHeight.value = "31"
+        Case "MP62"
+          txtcMPLat.value = "37.563200"
+          txtcMPLon.value = "-96.808188"
+          txtcMPHeight.value = "31"
+        Case "MP63"
+          txtcMPLat.value = "37.650325"
+          txtcMPLon.value = "-96.857170"
+          txtcMPHeight.value = "31"
+        Case "MP64"
+          txtcMPLat.value = "37.768644"
+          txtcMPLon.value = "-96.661555"
+          txtcMPHeight.value = "31"
+        Case "MP65"
+          txtcMPLat.value = "37.852586"
+          txtcMPLon.value = "-96.675600"
+          txtcMPHeight.value = "31"
+        Case "MP66"
+          txtcMPLat.value = "37.839306"
+          txtcMPLon.value = "-96.7633"
+          txtcMPHeight.value = "31"
+        Case "MP67"
+          txtcMPLat.value = "37.926557"
+          txtcMPLon.value = "-96.752313"
+          txtcMPHeight.value = "31"
+        Case "MP69"
+          txtcMPLat.value = "38.042539"
+          txtcMPLon.value = "-96.786401"
+          txtcMPHeight.value = "31"
+        Case "MP71"
+          txtcMPLat.value = "37.9182"
+          txtcMPLon.value = "-96.849211"
+          txtcMPHeight.value = "31"
+        Case "MP72"
+          txtcMPLat.value = "37.984193"
+          txtcMPLon.value = "-96.950800"
+          txtcMPHeight.value = "31"
+        Case "MP73"
+          txtcMPLat.value = "38.071074"
+          txtcMPLon.value = "-96.872800"
+          txtcMPHeight.value = "31"
+        Case "MP74"
+          txtcMPLat.value = "37.985195"
+          txtcMPLon.value = "-96.859497"
+          txtcMPHeight.value = "31"
+        Case "MP75"
+          txtcMPLat.value = "37.676026"
+          txtcMPLon.value = "-96.634207"
+          txtcMPHeight.value = "31"
+        Case "MP76"
+          txtcMPLat.value = "37.578004"
+          txtcMPLon.value = "-96.644073"
+          txtcMPHeight.value = "31"
+        Case "MP77"
+          txtcMPLat.value = "37.664659"
+          txtcMPLon.value = "-96.740693"
+          txtcMPHeight.value = "31"
+        Case "MP80"
+          txtcMPLat.value = "37.815182"
+          txtcMPLon.value = "-96.847778"
+          txtcMPHeight.value = "50"
+        Case "MP81"
+          txtcMPLat.value = "37.514147"
+          txtcMPLon.value = "-97.010606"
+          txtcMPHeight.value = "38"
+        Case "MP82"
+          txtcMPLat.value = "37.518425"
+          txtcMPLon.value = "-97.009819"
+          txtcMPHeight.value = "38"
+      End Select
+    End If
+  Next
+End Sub
+
+'********************************************************************
+'* MPChangedd - This subroutine checks for the dropdown list to change.
+'*  When it does change, it assigns values to the fields next to it.
+'********************************************************************
+Sub MPChangedd
+  For Each objOption in OptionChooserd.Options
+    If objOption.Selected Then
+      Select Case objOption.InnerText
+        Case "Select a MP"
+          txtdMPLat.value = ""
+          txtdMPLon.value = ""
+          txtdMPHeight.value = ""
+        Case "MP1"
+          txtdMPLat.value = "37.621907"
+          txtdMPLon.value = "-97.138265"
+          txtdMPHeight.value = "40"
+        Case "MP2"
+          txtdMPLat.value = "37.640269"
+          txtdMPLon.value = "-97.205134"
+          txtdMPHeight.value = "31"
+        Case "MP3"
+          txtdMPLat.value = "37.619459"
+          txtdMPLon.value = "-97.189555"
+          txtdMPHeight.value = "31"
+        Case "MP4"
+          txtdMPLat.value = "37.621484"
+          txtdMPLon.value = "-97.031991"
+          txtdMPHeight.value = "31"
+        Case "MP5"
+          txtdMPLat.value = "37.548696"
+          txtdMPLon.value = "-97.032387"
+          txtdMPHeight.value = "31"
+        Case "MP6"
+          txtdMPLat.value = "37.592339"
+          txtdMPLon.value = "-97.078094"
+          txtdMPHeight.value = "31"
+        Case "MP7"
+          txtdMPLat.value = "37.562897"
+          txtdMPLon.value = "-97.154270"
+          txtdMPHeight.value = "31"
+        Case "MP8"
+          txtdMPLat.value = "37.519147"
+          txtdMPLon.value = "-97.217560"
+          txtdMPHeight.value = "31"
+        Case "MP9"
+          txtdMPLat.value = "37.537104"
+          txtdMPLon.value = "-97.208051"
+          txtdMPHeight.value = "31"
+        Case "MP10"
+          txtdMPLat.value = "37.484701"
+          txtdMPLon.value = "-97.135183"
+          txtdMPHeight.value = "31"
+        Case "MP11"
+          txtdMPLat.value = "37.5196"
+          txtdMPLon.value = "-97.0381"
+          txtdMPHeight.value = "31"
+        Case "MP12"
+          txtdMPLat.value = "37.519490"
+          txtdMPLon.value = "-96.933376"
+          txtdMPHeight.value = "31"
+        Case "MP13"
+          txtdMPLat.value = "37.588987"
+          txtdMPLon.value = "-96.980869"
+          txtdMPHeight.value = "31"
+        Case "MP14"
+          txtdMPLat.value = "37.585080"
+          txtdMPLon.value = "-96.899171"
+          txtdMPHeight.value = "31"
+        Case "MP15"
+          txtdMPLat.value = "37.578107"
+          txtdMPLon.value = "-96.935453"
+          txtdMPHeight.value = "31"
+        Case "MP16"
+          txtdMPLat.value = "37.670314"
+          txtdMPLon.value = "-96.917020"
+          txtdMPHeight.value = "31"
+        Case "MP17"
+          txtdMPLat.value = "37.693982"
+          txtdMPLon.value = "-96.860312"
+          txtdMPHeight.value = "31"
+        Case "MP18"
+          txtdMPLat.value = "37.735701"
+          txtdMPLon.value = "-96.880348"
+          txtdMPHeight.value = "31"
+        Case "MP19"
+          txtdMPLat.value = "37.766589"
+          txtdMPLon.value = "-96.734292"
+          txtdMPHeight.value = "31"
+        Case "MP20"
+          txtdMPLat.value = "37.721254"
+          txtdMPLon.value = "-96.716013"
+          txtdMPHeight.value = "31"
+        Case "MP21"
+          txtdMPLat.value = "37.693994"
+          txtdMPLon.value = "-96.800952"
+          txtdMPHeight.value = "31"
+        Case "MP23"
+          txtdMPLat.value = "37.737665"
+          txtdMPLon.value = "-96.956315"
+          txtdMPHeight.value = "31"
+        Case "MP24"
+          txtdMPLat.value = "37.766444"
+          txtdMPLon.value = "-96.948270"
+          txtdMPHeight.value = "31"
+        Case "MP25"
+          txtdMPLat.value = "37.781190"
+          txtdMPLon.value = "-97.002861"
+          txtdMPHeight.value = "31"
+        Case "MP26"
+          txtdMPLat.value = "37.766952"
+          txtdMPLon.value = "-97.079402"
+          txtdMPHeight.value = "31"
+        Case "MP27"
+          txtdMPLat.value = "37.75246"
+          txtdMPLon.value = "-97.18677"
+          txtdMPHeight.value = "31"
+        Case "MP28"
+          txtdMPLat.value = "37.832409"
+          txtdMPLon.value = "-97.152349"
+          txtdMPHeight.value = "31"
+        Case "MP29"
+          txtdMPLat.value = "37.868881"
+          txtdMPLon.value = "-97.096208"
+          txtdMPHeight.value = "31"
+        Case "MP30"
+          txtdMPLat.value = "37.854281"
+          txtdMPLon.value = "-96.987901"
+          txtdMPHeight.value = "31"
+        Case "MP31"
+          txtdMPLat.value = "37.650274"
+          txtdMPLon.value = "-97.109693"
+          txtdMPHeight.value = "31"
+        Case "MP32"
+          txtdMPLat.value = "37.686883"
+          txtdMPLon.value = "-97.098477"
+          txtdMPHeight.value = "31"
+        Case "MP33"
+          txtdMPLat.value = "37.708656"
+          txtdMPLon.value = "-97.092318"
+          txtdMPHeight.value = "31"
+        Case "MP34"
+          txtdMPLat.value = "37.695664"
+          txtdMPLon.value = "-97.061914"
+          txtdMPHeight.value = "31"
+        Case "MP35"
+          txtdMPLat.value = "37.528511"
+          txtdMPLon.value = "-97.098709"
+          txtdMPHeight.value = "31"
+        Case "MP36"
+          txtdMPLat.value = "37.840322"
+          txtdMPLon.value = "-97.239604"
+          txtdMPHeight.value = "31"
+        Case "MP37"
+          txtdMPLat.value = "37.878764"
+          txtdMPLon.value = "-97.214274"
+          txtdMPHeight.value = "31"
+        Case "MP38"
+          txtdMPLat.value = "37.910355"
+          txtdMPLon.value = "-97.299790"
+          txtdMPHeight.value = "31"
+        Case "MP39"
+          txtdMPLat.value = "37.998028"
+          txtdMPLon.value = "-97.299999"
+          txtdMPHeight.value = "31"
+        Case "MP40"
+          txtdMPLat.value = "38.055349"
+          txtdMPLon.value = "-97.300017"
+          txtdMPHeight.value = "31"
+        Case "MP41"
+          txtdMPLat.value = "38.072160"
+          txtdMPLon.value = "-97.245094"
+          txtdMPHeight.value = "31"
+        Case "MP42"
+          txtdMPLat.value = "38.086915"
+          txtdMPLon.value = "-97.196320"
+          txtdMPHeight.value = "31"
+        Case "MP31"
+          txtdMPLat.value = "38.031841"
+          txtdMPLon.value = "-97.139496"
+          txtdMPHeight.value = "31"
+        Case "MP44"
+          txtdMPLat.value = "38.013167"
+          txtdMPLon.value = "-97.209249"
+          txtdMPHeight.value = "31"
+        Case "MP45"
+          txtdMPLat.value = "37.980123"
+          txtdMPLon.value = "-97.152852"
+          txtdMPHeight.value = "31"
+        Case "MP46"
+          txtdMPLat.value = "37.941293"
+          txtdMPLon.value = "-97.201055"
+          txtdMPHeight.value = "31"
+        Case "MP47"
+          txtdMPLat.value = "37.954974"
+          txtdMPLon.value = "-97.115815"
+          txtdMPHeight.value = "31"
+        Case "MP48"
+          txtdMPLat.value = "37.960763"
+          txtdMPLon.value = "-97.024251"
+          txtdMPHeight.value = "31"
+        Case "MP49"
+          txtdMPLat.value = "37.737869"
+          txtdMPLon.value = "-97.133504"
+          txtdMPHeight.value = "31"
+        Case "MP50"
+          txtdMPLat.value = "37.781503"
+          txtdMPLon.value = "-97.152149"
+          txtdMPHeight.value = "31"
+        Case "MP51"
+          txtdMPLat.value = "37.803413"
+          txtdMPLon.value = "-97.061499"
+          txtdMPHeight.value = "31"
+        Case "MP52"
+          txtdMPLat.value = "37.752334"
+          txtdMPLon.value = "-97.057063"
+          txtdMPHeight.value = "31"
+        Case "MP54"
+          txtdMPLat.value = "38.014182"
+          txtdMPLon.value = "-97.071298"
+          txtdMPHeight.value = "31"
+        Case "MP55"
+          txtdMPLat.value = "38.065698"
+          txtdMPLon.value = "-97.116296"
+          txtdMPHeight.value = "31"
+        Case "MP56"
+          txtdMPLat.value = "38.071955"
+          txtdMPLon.value = "-97.047099"
+          txtdMPHeight.value = "31"
+        Case "MP57"
+          txtdMPLat.value = "38.045955"
+          txtdMPLon.value = "-96.968825"
+          txtdMPHeight.value = "31"
+        Case "MP58"
+          txtdMPLat.value = "37.929282"
+          txtdMPLon.value = "-96.969123"
+          txtdMPHeight.value = "31"
+        Case "MP59"
+          txtdMPLat.value = "37.89739"
+          txtdMPLon.value = "-96.9558"
+          txtdMPHeight.value = "31"
+        Case "MP60"
+          txtdMPLat.value = "37.647153"
+          txtdMPLon.value = "-96.980660"
+          txtdMPHeight.value = "31"
+        Case "MP61"
+          txtdMPLat.value = "37.533187"
+          txtdMPLon.value = "-96.871105"
+          txtdMPHeight.value = "31"
+        Case "MP62"
+          txtdMPLat.value = "37.563200"
+          txtdMPLon.value = "-96.808188"
+          txtdMPHeight.value = "31"
+        Case "MP63"
+          txtdMPLat.value = "37.650325"
+          txtdMPLon.value = "-96.857170"
+          txtdMPHeight.value = "31"
+        Case "MP64"
+          txtdMPLat.value = "37.768644"
+          txtdMPLon.value = "-96.661555"
+          txtdMPHeight.value = "31"
+        Case "MP65"
+          txtdMPLat.value = "37.852586"
+          txtdMPLon.value = "-96.675600"
+          txtdMPHeight.value = "31"
+        Case "MP66"
+          txtdMPLat.value = "37.839306"
+          txtdMPLon.value = "-96.7633"
+          txtdMPHeight.value = "31"
+        Case "MP67"
+          txtdMPLat.value = "37.926557"
+          txtdMPLon.value = "-96.752313"
+          txtdMPHeight.value = "31"
+        Case "MP69"
+          txtdMPLat.value = "38.042539"
+          txtdMPLon.value = "-96.786401"
+          txtdMPHeight.value = "31"
+        Case "MP71"
+          txtdMPLat.value = "37.9182"
+          txtdMPLon.value = "-96.849211"
+          txtdMPHeight.value = "31"
+        Case "MP72"
+          txtdMPLat.value = "37.984193"
+          txtdMPLon.value = "-96.950800"
+          txtdMPHeight.value = "31"
+        Case "MP73"
+          txtdMPLat.value = "38.071074"
+          txtdMPLon.value = "-96.872800"
+          txtdMPHeight.value = "31"
+        Case "MP74"
+          txtdMPLat.value = "37.985195"
+          txtdMPLon.value = "-96.859497"
+          txtdMPHeight.value = "31"
+        Case "MP75"
+          txtdMPLat.value = "37.676026"
+          txtdMPLon.value = "-96.634207"
+          txtdMPHeight.value = "31"
+        Case "MP76"
+          txtdMPLat.value = "37.578004"
+          txtdMPLon.value = "-96.644073"
+          txtdMPHeight.value = "31"
+        Case "MP77"
+          txtdMPLat.value = "37.664659"
+          txtdMPLon.value = "-96.740693"
+          txtdMPHeight.value = "31"
+        Case "MP80"
+          txtdMPLat.value = "37.815182"
+          txtdMPLon.value = "-96.847778"
+          txtdMPHeight.value = "50"
+        Case "MP81"
+          txtdMPLat.value = "37.514147"
+          txtdMPLon.value = "-97.010606"
+          txtdMPHeight.value = "38"
+        Case "MP82"
+          txtdMPLat.value = "37.518425"
+          txtdMPLon.value = "-97.009819"
+          txtdMPHeight.value = "38"
+      End Select
+    End If
+  Next
+End Sub
+
+'********************************************************************
+'* MPChange - This subroutine is triggered when any of the RADWINManager
+'text fields for the MonoPole are edited.
+'********************************************************************
+Sub MPChange
+  strUseField = "UseMP"
+  'txtIP.value = ""
+End Sub
+
+'********************************************************************
+'* IPChange - This subroutine is triggered when he RADWINManager
+'text fields for the IP is edited.
+'********************************************************************
+Sub IPChange
+  strUseField = "UseIP"
+End Sub
+
+'********************************************************************
+'* Sleep - This subroutine open waits.
+'********************************************************************
+Sub Sleep (Timesec)
+  Set objwsh = CreateObject("WScript.Shell") 
+  objwsh.Run "Timeout /T " & Timesec & " /nobreak" ,0 ,true
+  Set objwsh = Nothing
+End Sub
+
+'********************************************************************
+'* RadwinSub - This subroutine opens Radwin Manager.
+'********************************************************************
+Sub RadwinSub
+  dim strEXE
+  strEXE = "RADWINManager.exe"
+  strCommand = strEXE & " " & strIP
+  Set objShell = CreateObject("Wscript.Shell")
+  objShell.Run strCommand
+End Sub
+
+'********************************************************************
+'* KillRadwin - This subroutine will kill all open Radwin Processes.
+'********************************************************************
+Sub KillRadwin
+  strCommand = "cmd /c taskkill /f /IM RADWINManager.exe"
+  Set objShell = CreateObject("Wscript.Shell")
+  objShell.run(strCommand),7,True
+End Sub
+
+'********************************************************************
+'* KillEdge - This subroutine kills all Microsoft Edge browser tabs.
+'********************************************************************
+Sub KillEdge
+  strCommand = "cmd /c taskkill /F /IM MicrosoftEdge.exe"
+  Set objShell = CreateObject("Wscript.Shell")
+  objShell.run(strCommand),7,True
+End Sub
+
+'********************************************************************
+'* KillChrome - This subroutine kills all Google Chrome browser tabs.
+'********************************************************************
+Sub KillChrome
+  strCommand = "cmd /c taskkill /F /IM chrome.exe"
+  Set objShell = CreateObject("Wscript.Shell")
+  objShell.run(strCommand),7,True
+End Sub
+
+'********************************************************************
+'* KillJava - This subroutine kills all Google Chrome browser tabs.
+'********************************************************************
+Sub KillJava
+  strCommand = "cmd /c taskkill /F /IM java.exe"
+  Set objShell = CreateObject("Wscript.Shell")
+  objShell.run(strCommand),7,True
+End Sub
+
+'********************************************************************
+'* KillGEarth - This subroutine kills Google Earth.
+'********************************************************************
+Sub KillGEarth
+  strCommand = "cmd /c taskkill /F /IM googleearth.exe"
+  Set objShell = CreateObject("Wscript.Shell")
+  objShell.run(strCommand),7,True
+End Sub
+
+'********************************************************************
+'* KillExcel - This subroutine kills all MS Excel worksheets.
+'********************************************************************
+Sub KillExcel
+  strCommand = "cmd /c taskkill /F /IM EXCEL.EXE"
+  Set objShell = CreateObject("Wscript.Shell")
+  objShell.run(strCommand),7,True
+End Sub
+
+'********************************************************************
+'* KillSnip - This subroutine kills the Snipping Tool App.
+'********************************************************************
+Sub KillSnip
+  strCommand = "cmd /c taskkill /F /IM SnippingTool.exe"
+  Set objShell = CreateObject("Wscript.Shell")
+  objShell.run(strCommand),7,True
+End Sub
+
+'********************************************************************
+'* KillOutlook - This subroutine kills MS Outlook.
+'********************************************************************
+Sub KillOutlook
+  strCommand = "cmd /c taskkill /F /IM OUTLOOK.EXE"
+  Set objShell = CreateObject("Wscript.Shell")
+  objShell.run(strCommand),7,True
+End Sub
+
+'********************************************************************
+'* KillSlack - This subroutine kills all MS Excel worksheets.
+'********************************************************************
+Sub KillSlack
+  strCommand = "cmd /c taskkill /F /IM slack.exe"
+  Set objShell = CreateObject("Wscript.Shell")
+  objShell.run(strCommand),7,True
+End Sub
+
+'********************************************************************
+'* KillTeams - This subroutine kills the Snipping Tool App.
+'********************************************************************
+Sub KillTeams
+  strCommand = "cmd /c taskkill /F /IM Teams.exe"
+  Set objShell = CreateObject("Wscript.Shell")
+  objShell.run(strCommand),7,True
+End Sub
+
+'********************************************************************
+'* GoHome - This subroutine closes all the above and reboots.
+'********************************************************************
+Sub GoHome
+  KillRadwin()
+  KillEdge()
+  KillChrome()
+  KillJava()
+  KillGEarth()
+  KillExcel()
+  KillSnip()
+  KillOutlook()
+  KillSlack()
+  KillTeams()
+  
+  strCommand = "shutdown -r -t 00"
+  Set objShell = CreateObject("Wscript.Shell")
+  objShell.run(strCommand),7,True 
+End Sub
+
+'********************************************************************
+'* OpenTab1 - This subroutine activates the "tab" the user clicked on.
+'********************************************************************
+Sub OpenTab1
+    self.ResizeTo 500,450
+    Tab2.style.visibility = "hidden"
+    Tab3.style.visibility = "hidden"
+    Tab1.style.visibility = "visible"
+    Tab4.style.visibility = "hidden"
+    CurrentTab=1
+End Sub
+
+'********************************************************************
+'* OpenTab2 - This subroutine activates the "tab" the user clicked on.
+'********************************************************************
+Sub OpenTab2
+    self.ResizeTo 500,475
+    Tab1.style.visibility = "hidden"
+    Tab3.style.visibility = "hidden"
+    Tab2.style.visibility = "visible"
+    Tab4.style.visibility = "hidden"
+    CurrentTab=2
+End Sub
+
+'********************************************************************
+'* OpenTab3 - This subroutine activates the "tab" the user clicked on.
+'********************************************************************
+Sub OpenTab3
+    self.ResizeTo 500,350
+    Tab1.style.visibility = "hidden"
+    Tab2.style.visibility = "hidden"
+    Tab3.style.visibility = "visible"
+    Tab4.style.visibility = "hidden"
+    CurrentTab=3
+End Sub
+
+'********************************************************************
+'* OpenTab4 - This subroutine activates the "tab" the user clicked on.
+'********************************************************************
+Sub OpenTab4
+self.ResizeTo 520,520
+    Tab1.style.visibility = "hidden"
+    Tab2.style.visibility = "hidden"
+    Tab3.style.visibility = "hidden"
+    Tab4.style.visibility = "visible"
+    CurrentTab=4
+End Sub
+
+'********************************************************************
+'* ThemeDefault - This subroutine sets the CSS styles to default theme.
+'********************************************************************
+Sub ThemeDefault
+  txtTheme = "Default"
+  txtColor = "07"
+
+  'Set Main Body colors
+  document.bgColor="Silver"
+  document.body.text="Black"
+
+  Set oElements = document.GetElementsByTagName("select")
+  For Each oElement in oElements
+    oElement.ClassName = "tDefault"
+  Next  
+  'Change the colors of Input objects
+  Set oElements = document.GetElementsByTagName("input")
+  For Each oElement in oElements
+    If oElement.Type="button" Then oElement.ClassName = "bDefault"
+    If oElement.Type="text" Then oElement.ClassName = "tDefault"
+    If oElement.Type="password" Then oElement.ClassName = "tDefault"
+  Next
+End Sub
+
+'********************************************************************
+'* ThemeDarkRed - This subroutine sets the CSS styles to the DarkRed theme.
+'********************************************************************
+Sub ThemeDarkRed
+  txtTheme = "Red"
+  txtColor = "04"
+
+  'Set Main Body colors
+  document.bgColor="Black"
+  document.body.text="Red"
+
+  'Change the colors of Drop Down Lists
+  Set oElements = document.GetElementsByTagName("select")
+  For Each oElement in oElements
+    oElement.ClassName = "tRed"
+  Next  
+  'Change the colors of Input objects
+  Set oElements = document.GetElementsByTagName("input")
+  For Each oElement in oElements
+    If oElement.Type="button" Then oElement.ClassName = "bRed"
+    If oElement.Type="text" Then oElement.ClassName = "tRed"
+    If oElement.Type="password" Then oElement.ClassName = "tRed"    
+  Next
+End Sub
+
+'********************************************************************
+'* ThemePrincess - This subroutine sets the CSS styles to Random theme.
+'********************************************************************
+Sub ThemePrincess
+  txtTheme = "Princess"
+  txtColor = "0d"
+  
+  'Set Main Body colors
+  document.bgColor="Black"
+  document.body.text="Purple"
+
+  'Change the colors of Drop Down Lists
+  Set oElements = document.GetElementsByTagName("select")
+  For Each oElement in oElements
+    oElement.ClassName = "tPrincess"
+  Next  
+  'Change the colors of Input objects
+  Set oElements = document.GetElementsByTagName("input")
+  For Each oElement in oElements
+    If oElement.Type="button" Then oElement.ClassName = "bPrincess"
+    If oElement.Type="text" Then oElement.ClassName = "tPrincess"
+    If oElement.Type="password" Then oElement.ClassName = "tPrincess"   
+  Next
+End Sub
+
+'********************************************************************
+'* ThemeTheMatrix - This subroutine sets the CSS styles to the Matrix theme.
+'********************************************************************
+Sub ThemeTheMatrix
+  txtTheme = "Green"
+  txtColor = "02"
+  
+  'Set Main Body colors
+  document.bgColor="Black"
+  document.body.text="Chartreuse"
+
+  'Change the colors of Drop Down Lists
+  Set oElements = document.GetElementsByTagName("select")
+  For Each oElement in oElements
+    oElement.ClassName = "tGreen"
+  Next
+  'Change the colors of Input objects
+  Set oElements = document.GetElementsByTagName("input")
+  For Each oElement in oElements
+    If oElement.Type="button" Then oElement.ClassName = "bGreen"
+    If oElement.Type="text" Then oElement.ClassName = "tGreen"
+    If oElement.Type="password" Then oElement.ClassName = "tGreen"    
+  Next
+End Sub
+
+'********************************************************************
+'* BLiNQ CPE - This subroutine is triggered by the BLiNQ CPE button
+'opens a browser window, passes the credentials, and presses the Enter button.
+'********************************************************************
+Sub BLiNQCPE
+
+    urlprefix = "https://"
+    CustRadius = txtIP.value
+    urlsuffix = ":8080"
+    url = urlprefix & CustRadius & urlsuffix
+
+    '* set password for eNodeB
+    txtBlinqUserName.value = "administrator"
+    txtBlinqPassword.value = "_BLiNQ_"
+
+    Set objShell = CreateObject("Wscript.Shell")
+
+    objShell.Run(url)
+
+    Sleep(3)
+
+    objShell.SendKeys "{TAB}"
+    objShell.SendKeys txtBlinqUserName.value
+    objShell.SendKeys "{TAB}"
+    objShell.SendKeys txtBlinqPassword.value
+    objShell.SendKeys "{ENTER}"
+
+    '* set password back to junk
+    txtBlinqUserName.value = "qwerty123"
+    txtBlinqPassword.value = "321ytrewq"    
+End Sub
+
+'********************************************************************
+'* BLiNQ eNodeB - This subroutine is triggered by the BLiNQ eNodeB button
+'opens a browser window, passes the credentials, and presses the Enter button.
+'********************************************************************
+Sub BLiNQeNodeB
+
+    urlprefix = "https://"
+    CustRadius = txtIP.value
+    url = urlprefix & CustRadius
+
+    '* set password for eNodeB
+    txtBlinqUserName.value = "admin"
+    txtBlinqPassword.value = "admin"
+
+    Set objShell = CreateObject("Wscript.Shell")
+
+    objShell.Run(url)
+
+    Sleep(5)
+
+    objShell.SendKeys "{TAB}"
+    objShell.SendKeys txtBlinqUserName.value
+    objShell.SendKeys "{TAB}"
+    objShell.SendKeys txtBlinqPassword.value
+    objShell.SendKeys "{ENTER}"
+
+    '* set password back to junk
+    txtBlinqUserName.value = "qwerty123"
+    txtBlinqPassword.value = "321ytrewq"        
+End Sub
+
+'********************************************************************
+'* ToUpperCase - This subroutine is triggered when the Paste/Copy button
+'is pressed.  It will paste the current clipboard contents into the
+'Lower Case text field, convert it to Upper Case, copy it to the
+'Clipboard, and display it in the Upper Case text field.
+'********************************************************************
+Sub ToUpperCase
+
+    'Copy the current Clipboard contents into a variable called txtClipBoard
+    txtClipBoard = Trim(CreateObject("htmlfile").ParentWindow.ClipboardData.GetData("text"))
+
+    strMAC = txtClipBoard
+
+    'Check to see if this MAC has colons
+    If InStr(txtClipBoard,":") = 0 Then
+      strColon = ":"
+      strMAC = Mid(txtClipBoard,1,2)
+      strMAC = strMAC + strColon + Mid(txtClipBoard,3,2)
+      strMAC = strMAC + strColon + Mid(txtClipBoard,5,2)
+      strMAC = strMAC + strColon + Mid(txtClipBoard,7,2)
+      strMAC = strMAC + strColon + Mid(txtClipBoard,9,2)
+      strMAC = strMAC + strColon + Mid(txtClipBoard,11,2)
+      'txtClipBoard = strMAC
+    end If
+
+    'Assign the value of a text field to txtClipBoard
+    txtLowerCase.value = txtClipBoard
+
+    txtClipBoard = Trim(strMAC)
+
+    'Prepare VBS to push data to the clipboard
+    Set WshShell = CreateObject("WScript.Shell")
+    Set oExec = WshShell.Exec("clip")
+    Set oIn = oExec.stdIn
+    
+    'Push the uppercase value into the clipboard
+    oIn.WriteLine Trim(UCase(strMAC))
+    
+    txtUpperCase.value = UCase(strMAC)
+End Sub
+
+'********************************************************************
+'* Set IP - This subroutine will select an IP from data in the
+'MP, L, and Sector fields from a CSV file named IPRange.csv loaded in
+'Window_Onload subroutine.
+'********************************************************************
+Sub SetIP
+  'Initialize variables
+  Dim strMP, strLayer, strSector, strRawIP, strTempIP1, strTempIP2
+  x=0
+  strMP = txtMonopole.value
+  strLayer = txtLayer.value
+  strSector = txtSector.value
+
+  'First IF Loop checks which field to use: IP or MP Layer Sector
+  if strUseField = "UseIP" Then
+    'The last field edited was the HBS IP field.
+
+    'Set the variable for IP to the value in the IP field.
+    strIP = txtIP.value
+    
+    'Set the global variable to the program, a space, and the IP.
+    strCommand = strEXE & " " & strIP
+    
+    'Call the correct subroutine.
+    If xRadwin = 1 Then
+      RadwinSub()
+      elseif xPing = 1 Then
+        TimedPing()
+      else
+        MsgBox("I Love You!")
+    end If
+  else
+    'The last field edited was one of the MP fields.
+
+    'Second IF Loop checks the MP values.
+    if strMP = "" Then
+      'The MP field is blank. Send error message.  
+      MsgBox("MP Field is blank.")
+    elseif strMP = "e" OR strMP = "E" Then
+      'Use wants to open Elbing Grain radio.
+      
+      'Pass the IP for Ebling Grain radio and open Radwin.
+      strIP = "172.17.100.137"
+      strCommand = strEXE & " " & strIP
+      'Call the correct subroutine.
+      If xRadwin = 1 Then
+        RadwinSub()
+        elseif xPing = 1 Then
+          TimedPing()
+        else
+          MsgBox("I Love You!")
+      end If
+      'At this point the MP field has a value in it.
+      'Check to see if the Layer and Sector have values.
+    elseif strLayer = "" Then
+      'The MP field has a value, the Layer field is blank.        
+      If strSector = "" Then
+        'The MP field has a value, the Layer field is blank, the Sector is blank.
+        Do While CSVArray(x,0) > 0
+          If CSVArray(x,0) = txtMonopole.value Then
+            strIP = CSVArray(x,3)
+            strCommand = strEXE & " " & strIP
+            'Call the correct subroutine.
+            If xRadwin = 1 Then
+              RadwinSub()
+              elseif xPing = 1 Then
+                TimedPing()
+              else
+                MsgBox("I Love You!")
+            end If
+            Sleep(1)
+          end If
+          x = x + 1
+        Loop
+      else
+        'The MP has a value, the Layer is blank, the Sector has a value.
+
+        'If the value of the sector is "45" change it to "045"
+        If txtSector.value = "45" Then
+          txtSector.value = "045"
+        end If  
+        Do While CSVArray(x,0) > 0
+          If CSVArray(x,0) = txtMonopole.value Then
+              If CSVArray(x,2) = txtSector.value Then
+                strIP = CSVArray(x,3)
+                strCommand = strEXE & " " & strIP
+                    'Call the correct subroutine.
+    If xRadwin = 1 Then
+      RadwinSub()
+      elseif xPing = 1 Then
+        TimedPing()
+      else
+        MsgBox("I Love You!")
+    end If
+                Sleep(1)
+              end If
+          end If
+          x = x + 1
+        Loop
+      end If
+    else
+      'The MP field has a value, the Layer has a value
+
+      If strSector = "" Then
+        'The MP field has a value, the Layer has a value, the Sector is blank.
+        Do While CSVArray(x,0) > 0
+          If CSVArray(x,0) = txtMonopole.value Then
+            If CSVArray(x,1) = txtLayer.value Then
+              strIP = CSVArray(x,3)
+              strCommand = strEXE & " " & strIP
+                  'Call the correct subroutine.
+    If xRadwin = 1 Then
+      RadwinSub()
+      elseif xPing = 1 Then
+        TimedPing()
+      else
+        MsgBox("I Love You!")
+    end If
+              Sleep(1)
+            end If
+          end If
+          x = x + 1
+        Loop
+      else
+        'The MP has a value, the Layer has a value, the Sector has a value.
+
+        'If the value of the sector is "45" change it to "045"
+        If txtSector.value = "45" Then
+          txtSector.value = "045"
+        end If  
+        Do While CSVArray(x,0) > 0
+          If CSVArray(x,0) = txtMonopole.value Then
+            If CSVArray(x,1) = txtLayer.value Then
+              If CSVArray(x,2) = txtSector.value Then
+                strIP = CSVArray(x,3)
+                strCommand = strEXE & " " & strIP
+                    'Call the correct subroutine.
+    If xRadwin = 1 Then
+      RadwinSub()
+      elseif xPing = 1 Then
+        TimedPing()
+      else
+        MsgBox("I Love You!")
+    end If
+                Sleep(1)
+              end If
+            end If
+          end If
+          x = x + 1
+        Loop
+      end If
+    end If
+  end If
+End Sub
+
+'********************************************************************
+'* OpenRadwin subroutine - This subroutine will set the xRadwin flag
+'and call the SetIP subroutine.  This is needed as the Multi-Ping Subroutine
+'also runs in the same SetIP Subroutine and a flag is needed to determine
+'which button has been clicked.
+'********************************************************************
+Sub RadwinRadio
+  xRadwin = 1
+  SetIP()
+  xRadwin = 0
+End Sub
+
+'********************************************************************
+'* Mulitping subroutine - This subroutine will set the xPing flag
+'and call the SetIP subroutine.  This is needed as the RadwinRadio Subroutine
+'also runs in the same SetIP Subroutine and a flag is needed to determine
+'which button has been clicked.
+'********************************************************************
+Sub MultiPing
+  xPing = 1
+  SetIP()
+  xPing = 0
+  strIP = ""
+End Sub
+
+'********************************************************************
+'Run the following command from a batch file
+'* ping -t 172.17.100.33|cmd /q /v /c "(pause&pause)>nul & for /l %a in () do (set /p "data=" && echo(!time! !data!)&ping -n 2 localhost>nul"
+'********************************************************************
+Sub TimedPing
+  'IF Loop checks which field to use: IP or MP Layer Sector
+  If strUseField = "UseIP" Then
+    'The last field edited was the Radio IP field.
+    'Set the variable for IP to the value in the IP field.
+    strIP = txtIP.value
+  end If  
+  'This  passes the IP and colors to the batch file.
+  'A command line takes two numbers as back and forground colors.
+  'More info on colors by typing COLOR /? at a dos prompt. 
+  Set objShell = CreateObject ("WScript.Shell")
+  objShell.Run "TimedPing.bat " & strIP & " " & txtColor
+End Sub
+
+'********************************************************************
+'* CleanNumber - This subroutine is triggered when the Paste/Copy button
+'in the Phone Number Conversion is pressed.  It will paste the current
+'clipboard contents into the Dirty Number text field, remove any spaces and
+'special characters, paste it into the Clean Number field and copy it to the clipboard.
+'********************************************************************
+Sub CleanNumber
+
+    'Trim (remove leading and trailing zeros), and Copy the current Clipboard contents into a variable called txtClipBoard
+    txtClipBoard = Trim(CreateObject("htmlfile").ParentWindow.ClipboardData.GetData("text"))
+
+    'Show what was copied in the text field. 
+    txtDirtyNumber.value = txtClipBoard
+
+    'Replace characters we don't want with nothing 
+    strPhone = Replace(txtClipBoard,"(","")
+    strPhone = Replace(strPhone,")","")
+    strPhone = Replace(strPhone," ","")
+    strPhone = Replace(strPhone,"-","")
+
+    'Prepare VBS to push data to the clipboard
+    Set WshShell = CreateObject("WScript.Shell")
+    Set oExec = WshShell.Exec("clip")
+    Set oIn = oExec.stdIn
+    
+    'Push the uppercase value into the clipboard
+    oIn.WriteLine strPhone
+    
+    txtCleanNumber.value = strPhone
+End Sub
+
+'********************************************************************
+'* This subroutine opens a command prompt and uses the theme color
+'********************************************************************
+Sub CLI
+  Set objShell = CreateObject("Wscript.Shell")
+  If txtTheme = "Default" Then objShell.Run "cmd.exe /k cd\ & prompt $t $P$G & color 07"
+  If txtTheme = "Red" Then objShell.Run "cmd.exe /k cd\ & prompt $t $P$G & color 04"
+  If txtTheme = "Green" Then objShell.Run "cmd.exe /k cd\ & prompt $t $P$G & color 02"
+  If txtTheme = "Princess" Then objShell.Run "cmd.exe /k cd\ & prompt $t $P$G & color 05"
+End Sub
+
+'*************************************************************************
+'* This subroutine searches CSVArray for the New MP/Layer/Sector or the IP
+'*************************************************************************
+Sub IPLUSearch
+  
+      'This "splits" the line into another array creating a multi-Dimensional array.
+      'CSVArray(0,0) will be everything before the first comma on the first row = Monopole
+      'CSVArray(1,1) will be everything between the first and second commas on the second row = Layer
+      'CSVArray(0,2) will be everything between the second and third commas on the first row = Sector
+      'CSVArray(1,3) will be everything after the third comma on the second row = IP Address
+
+
+  'If there is no IP to search for
+  'Step through the values of the array looking for a match on the IP.
+    'For i = 1 To IPLines
+    'If txtNewMP = CSVArray(i,0) Then
+     ' If txtNewLayer = CSVArray(i,1) Then
+      '  If txtNewSector = CSVArray(i,2) Then
+          'txtHBSID = "MP" & CSVArray(i,0) & " Layer" & CSVArray(i,1) & " Sector" & CSVArray(i,2)
+          'txtFoundIP = CSVArray(i,3)
+          'MsgBox(txtHBSID & "is set for IP: " & txtFoundIP,0,"Searching for IP")
+       '   else if
+        '    i = i + 1
+        'end If
+      'end If
+      'i = i + 1
+End Sub
+
+</SCRIPT>
+
+<body>
+    <table width="500">
+        <tr>
+            <td rowspan="3">
+                <img src="newvelo.png" align="center">
+            </td>
+            <td>
+            </td>
+            <td align="center">
+                <B>Themes</B>
+            </td>
+        </tr>
+        <tr>
+            <td>
+            </td>
+            <td align="center">
+                <input type="button" onclick="ThemeDefault()" value="Default" title="Oldie but Goodie!">
+                <input type="button" onclick="ThemeDarkRed()" value="Dark Red" title="For the Vampire in each of us.">
+            </td>
+        </tr>       
+        <tr>
+            <td>
+            </td>
+            <td align="center">
+                <input type="button" onclick="ThemePrincess()" value="Princess" title="You can be Pretty any time you want!">
+                <input type="button" onclick="ThemeTheMatrix" value="The Matrix" title="There is no Spoon">
+            </td>
+        </tr>     
+    </table>
+
+    <hr>
+
+    <div class="tabs">
+        <input type="button" onclick="OpenTab1()" value="Radio">
+        <input type="button" onclick="OpenTab2()" value="LoS">
+        <input type="button" onclick="OpenTab4()" value="Tools">
+        <input type="button" onclick="OpenTab3()" value="GoHome">
+    </div>
+
+    <div id="MasterDiv" class="wrapper">
+
+        <div id="Tab1">
+            <table align=center>
+                <tr>
+                    <td>
+                        <label for="txtIP">Radio IP: </label>
+                        <input type="text" id="txt4" name="txtIP" value="" size="17" OnChange="IPChange()" title="Put the IP Address is in here of the Radwin device to open.">
+                    </td>
+                </tr>
+            </table>
+
+            <fieldset class="bfont">
+                <legend class="bfont">Radwin Manager</legend>
+                <Table align=center>
+                <tr>
+                    <td align=center>
+                    <label for="txtMonopole">MP: </label>
+                    <input type="text" id="txt1" name="txtMonopole" value="" size="5" OnChange="MPChange()" title="Put a MonoPole or Tower number in here.  Use e or E for grain elevator in Elbing.  To open all radios on the MP, leave the other two fields blank.">
+                    </td>
+                    <td align=center>
+                    <label for="txtLayer">Layer: </label>
+                    <input type="text" id="txt2" name="txtLayer" value="" size="5" OnChange="MPChange()" title="Put the layer in here, or leave it blank to open every layer.  Tower 80 is reversed; 5.1 is layer 1.">
+                    </td>
+                    <td align=center>
+                    <label for="txtSector">Sector: </label>
+                    <input type="text" id="txt3" name="txtSector" value="" size="5" OnChange="MPChange()" title="Put the sector number in here, or leave blank to open every sector.">
+                    </td>
+                </tr>
+                <tr>
+                    <td align=center>
+                    <input type="button" id="btn9" value="RadWin" name="btnOpenRadwin"  onClick="RadwinRadio()" title="Open Radwin Manager."> 
+                    </td>
+                    <td></td>
+                    <td>   
+                    <input type="button" id="btn10" value="!NIWDAR" name="btnKillRadwin"  onClick="KillRadwin()" title="Kill all Open Radwin Manager Sessions.">          
+                    </td>      
+                </tr>
+                
+                </table>
+            </fieldset>
+            <fieldset>
+
+                <legend class="bfont">BLiNQ</legend>
+                <Table align=center>
+                    <tr>
+                        <td align=center>
+                        <label for="txtBlinqUserName">UserName</label>
+                        <input type="password" id="txtBlinqUserName" name="txtBlinqUserName" value="qwerty123" size="15" title="Put in your BLiNQ user ID.">
+                        </td>
+
+                        <td align=center>
+                        <label for="txtBlinqPassword">Password</label>
+                        <input type="password" id="txtBlinqPassword" name="txtBlinqPassword" value="321ytrewq" size="15" title="Put in your BLiNQ password.">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td align="center">
+                        <input type="button" id="btnBLiNQCPE" value="CPE" name="btnBLiNQCPE"  onClick="BLiNQCPE()" title="Open new browser Tab with BLiNQ CPE.">
+                        </td>
+                        <td align="center">
+                        <input type="button" id="btnBLiNQeNodeB" value="eNodeB" name="btnBLiNQeNodeB"  onClick="BLiNQeNodeB()" title="Open new browser Tab with BLiNQ eNodeB.">
+                        </td>
+                    </tr>
+                </table>
+            </fieldset>
+            <fieldset>
+              <legend class="bfont">CLI</legend>
+              <Table align=center>
+                <tr>
+                  <td align="center">
+                  <input type="button" id="btnTimedPing" value="Ping IP" name="btnTimedPing"  onClick="TimedPing()" title="Opens a ping -t window with timestamps on each line.">
+                  </td>
+                  <td colspan=15>                    
+                  </td>
+                  <td align="center">
+                  <input type="button" id="btnMultiPing" value="Mulit-Ping" name="btnMultiPing"  onClick="MultiPing()" title="Opens multiple ping -t windows with timestamps on each line.  Looks at the MP / Layer / Sector values.  Leave Layer or Sector blank to open all Layers or all Sectors.  You can leave both blank.">
+                  </td>          
+                  <td colspan=15>                    
+                  </td>
+                  <td align="center">
+                  <input type="button" id="btnCLI" value="CMD" name="btnCLI"  onClick="CLI()" title="Opens a command line interface.">
+                  </td>                            
+              </table>
+            </fieldset>
+        </div>
+
+        <div id="Tab2">
+            <fieldset id>
+            <legend class="bfont">LoS for Evals</legend>
+            <Table align=center id="table">
+            <tr>
+                <td> <! –– Blank Space for first row -->
+                </td>
+                <td align="center"><b>Lattitude</b>
+                </td>
+                </td>
+                <td align="center"><b>Longitude</b>
+                </td>
+                </td>
+                <td align="center"><b>Height</b>
+                </td>
+            </tr>
+            <tr>
+                <td align="center">Customer
+                </td>
+                <td align="center">
+                <input type="text" id="txt5" name="txtCustLat" value="" size="10" OnChange="CustChange()">
+                </td>
+                <td align="center">
+                <input type="text" id="txt6" name="txtCustLon" value="" size="10" OnChange="CustChange()">
+                </td>
+                <td align="center">
+                <input type="text" id="txt7" name="txtCustHeight" value="(in meters)" size="10" OnChange="CustChange()">
+                </td>
+            </tr>
+            <tr>
+                <td align="right" colspan="4"><input type="button" id="btn11" value="Reset" name="btnCustReset" onClick="CustReset()" title="Clear the Customer Information.">
+                </td>
+            </tr>
+            <tr>
+            <td colspan="4" align="center">
+                <hr>
+            </td>
+            </tr>
+            <tr>
+                <td align="center">
+                <select id="Opt1" name="OptionChoosera" onChange="MPChangeda" size="1">
+                    <option value="MPSelect">Select a MP</option>
+                    <option value="MP1">MP1</option>
+                    <option value="MP2">MP2</option>
+                    <option value="MP3">MP3</option>
+                    <option value="MP4">MP4</option>
+                    <option value="MP5">MP5</option>
+                    <option value="MP6">MP6</option>
+                    <option value="MP7">MP7</option>
+                    <option value="MP8">MP8</option>
+                    <option value="MP9">MP9</option>
+                    <option value="MP10">MP10</option>
+                    <option value="MP11">MP11</option>
+                    <option value="MP12">MP12</option>
+                    <option value="MP13">MP13</option>
+                    <option value="MP14">MP14</option>
+                    <option value="MP15">MP15</option>
+                    <option value="MP16">MP16</option>
+                    <option value="MP17">MP17</option>
+                    <option value="MP18">MP18</option>
+                    <option value="MP19">MP19</option>
+                    <option value="MP20">MP20</option>
+                    <option value="MP21">MP21</option>
+                    <option value="MP23">MP23</option>
+                    <option value="MP24">MP24</option>
+                    <option value="MP25">MP25</option>
+                    <option value="MP26">MP26</option>
+                    <option value="MP27">MP27</option>
+                    <option value="MP28">MP28</option>
+                    <option value="MP29">MP29</option>
+                    <option value="MP30">MP30</option>
+                    <option value="MP31">MP31</option>
+                    <option value="MP32">MP32</option>
+                    <option value="MP33">MP33</option>
+                    <option value="MP34">MP34</option>
+                    <option value="MP35">MP35</option>
+                    <option value="MP36">MP36</option>
+                    <option value="MP37">MP37</option>
+                    <option value="MP38">MP38</option>
+                    <option value="MP39">MP39</option>
+                    <option value="MP40">MP40</option>
+                    <option value="MP41">MP41</option>
+                    <option value="MP42">MP42</option>
+                    <option value="MP43">MP43</option>
+                    <option value="MP44">MP44</option>
+                    <option value="MP45">MP45</option>
+                    <option value="MP46">MP46</option>
+                    <option value="MP47">MP47</option>
+                    <option value="MP48">MP48</option>
+                    <option value="MP49">MP49</option>
+                    <option value="MP50">MP50</option>
+                    <option value="MP51">MP51</option>
+                    <option value="MP52">MP52</option>
+                    <option value="MP54">MP54</option>
+                    <option value="MP55">MP55</option>
+                    <option value="MP56">MP56</option>
+                    <option value="MP57">MP57</option>
+                    <option value="MP58">MP58</option>
+                    <option value="MP59">MP59</option>
+                    <option value="MP60">MP60</option>
+                    <option value="MP61">MP61</option>
+                    <option value="MP62">MP62</option>
+                    <option value="MP63">MP63</option>
+                    <option value="MP64">MP64</option>
+                    <option value="MP65">MP65</option>
+                    <option value="MP66">MP66</option>
+                    <option value="MP67">MP67</option>
+                    <option value="MP68">MP68</option>
+                    <option value="MP69">MP69</option>
+                    <option value="MP70">MP70</option>
+                    <option value="MP71">MP71</option>
+                    <option value="MP72">MP72</option>
+                    <option value="MP73">MP73</option>
+                    <option value="MP74">MP74</option>
+                    <option value="MP75">MP75</option>
+                    <option value="MP76">MP76</option>
+                    <option value="MP77">MP77</option>
+                    <option value="MP80">MP80</option>
+                    <option value="MP81">MP81</option>
+                    <option value="MP82">MP82</option>
+                    </select> 
+                </td>
+                <td align="center">
+                <input type="text" id="txt8" name="txtaMPLat" value="" readonly size="10">
+                </td>
+                <td align="center">
+                <input type="text" id="txt9" name="txtaMPLon" value="" readonly size="10" >
+                </td>
+                <td align="center">
+                <input type="text" id="txt10" name="txtaMPHeight" value="" readonly size="10" >
+                </td>
+            </tr>
+            <tr>
+                <td align="center">
+                <select id="Opt2" name="OptionChooserb" onChange="MPChangedb" size="1">
+                    <option value="MPSelect">Select a MP</option>
+                    <option value="MP1">MP1</option>
+                    <option value="MP2">MP2</option>
+                    <option value="MP3">MP3</option>
+                    <option value="MP4">MP4</option>
+                    <option value="MP5">MP5</option>
+                    <option value="MP6">MP6</option>
+                    <option value="MP7">MP7</option>
+                    <option value="MP8">MP8</option>
+                    <option value="MP9">MP9</option>
+                    <option value="MP10">MP10</option>
+                    <option value="MP11">MP11</option>
+                    <option value="MP12">MP12</option>
+                    <option value="MP13">MP13</option>
+                    <option value="MP14">MP14</option>
+                    <option value="MP15">MP15</option>
+                    <option value="MP16">MP16</option>
+                    <option value="MP17">MP17</option>
+                    <option value="MP18">MP18</option>
+                    <option value="MP19">MP19</option>
+                    <option value="MP20">MP20</option>
+                    <option value="MP21">MP21</option>
+                    <option value="MP23">MP23</option>
+                    <option value="MP24">MP24</option>
+                    <option value="MP25">MP25</option>
+                    <option value="MP26">MP26</option>
+                    <option value="MP27">MP27</option>
+                    <option value="MP28">MP28</option>
+                    <option value="MP29">MP29</option>
+                    <option value="MP30">MP30</option>
+                    <option value="MP31">MP31</option>
+                    <option value="MP32">MP32</option>
+                    <option value="MP33">MP33</option>
+                    <option value="MP34">MP34</option>
+                    <option value="MP35">MP35</option>
+                    <option value="MP36">MP36</option>
+                    <option value="MP37">MP37</option>
+                    <option value="MP38">MP38</option>
+                    <option value="MP39">MP39</option>
+                    <option value="MP40">MP40</option>
+                    <option value="MP41">MP41</option>
+                    <option value="MP42">MP42</option>
+                    <option value="MP43">MP43</option>
+                    <option value="MP44">MP44</option>
+                    <option value="MP45">MP45</option>
+                    <option value="MP46">MP46</option>
+                    <option value="MP47">MP47</option>
+                    <option value="MP48">MP48</option>
+                    <option value="MP49">MP49</option>
+                    <option value="MP50">MP50</option>
+                    <option value="MP51">MP51</option>
+                    <option value="MP52">MP52</option>
+                    <option value="MP54">MP54</option>
+                    <option value="MP55">MP55</option>
+                    <option value="MP56">MP56</option>
+                    <option value="MP57">MP57</option>
+                    <option value="MP58">MP58</option>
+                    <option value="MP59">MP59</option>
+                    <option value="MP60">MP60</option>
+                    <option value="MP61">MP61</option>
+                    <option value="MP62">MP62</option>
+                    <option value="MP63">MP63</option>
+                    <option value="MP64">MP64</option>
+                    <option value="MP65">MP65</option>
+                    <option value="MP66">MP66</option>
+                    <option value="MP67">MP67</option>
+                    <option value="MP68">MP68</option>
+                    <option value="MP69">MP69</option>
+                    <option value="MP70">MP70</option>
+                    <option value="MP71">MP71</option>
+                    <option value="MP72">MP72</option>
+                    <option value="MP73">MP73</option>
+                    <option value="MP74">MP74</option>
+                    <option value="MP75">MP75</option>
+                    <option value="MP76">MP76</option>
+                    <option value="MP77">MP77</option>
+                    <option value="MP80">MP80</option>
+                    <option value="MP81">MP81</option>
+                    <option value="MP82">MP82</option>
+                    </select> 
+                </td>
+                <td align="center">
+                <input type="text" id="txt11" name="txtbMPLat" value="" readonly size="10">
+                </td>
+                <td align="center">
+                <input type="text" id="txt12" name="txtbMPLon" value="" readonly size="10" >
+                </td>
+                <td align="center">
+                <input type="text" id="txt13" name="txtbMPHeight" value="" readonly size="10" >
+                </td>
+            </tr>
+            <tr>
+                <td align="center">
+                <select id="Opt3" name="OptionChooserc" onChange="MPChangedc" size="1">
+                    <option value="MPSelect">Select a MP</option>
+                    <option value="MP1">MP1</option>
+                    <option value="MP2">MP2</option>
+                    <option value="MP3">MP3</option>
+                    <option value="MP4">MP4</option>
+                    <option value="MP5">MP5</option>
+                    <option value="MP6">MP6</option>
+                    <option value="MP7">MP7</option>
+                    <option value="MP8">MP8</option>
+                    <option value="MP9">MP9</option>
+                    <option value="MP10">MP10</option>
+                    <option value="MP11">MP11</option>
+                    <option value="MP12">MP12</option>
+                    <option value="MP13">MP13</option>
+                    <option value="MP14">MP14</option>
+                    <option value="MP15">MP15</option>
+                    <option value="MP16">MP16</option>
+                    <option value="MP17">MP17</option>
+                    <option value="MP18">MP18</option>
+                    <option value="MP19">MP19</option>
+                    <option value="MP20">MP20</option>
+                    <option value="MP21">MP21</option>
+                    <option value="MP23">MP23</option>
+                    <option value="MP24">MP24</option>
+                    <option value="MP25">MP25</option>
+                    <option value="MP26">MP26</option>
+                    <option value="MP27">MP27</option>
+                    <option value="MP28">MP28</option>
+                    <option value="MP29">MP29</option>
+                    <option value="MP30">MP30</option>
+                    <option value="MP31">MP31</option>
+                    <option value="MP32">MP32</option>
+                    <option value="MP33">MP33</option>
+                    <option value="MP34">MP34</option>
+                    <option value="MP35">MP35</option>
+                    <option value="MP36">MP36</option>
+                    <option value="MP37">MP37</option>
+                    <option value="MP38">MP38</option>
+                    <option value="MP39">MP39</option>
+                    <option value="MP40">MP40</option>
+                    <option value="MP41">MP41</option>
+                    <option value="MP42">MP42</option>
+                    <option value="MP43">MP43</option>
+                    <option value="MP44">MP44</option>
+                    <option value="MP45">MP45</option>
+                    <option value="MP46">MP46</option>
+                    <option value="MP47">MP47</option>
+                    <option value="MP48">MP48</option>
+                    <option value="MP49">MP49</option>
+                    <option value="MP50">MP50</option>
+                    <option value="MP51">MP51</option>
+                    <option value="MP52">MP52</option>
+                    <option value="MP54">MP54</option>
+                    <option value="MP55">MP55</option>
+                    <option value="MP56">MP56</option>
+                    <option value="MP57">MP57</option>
+                    <option value="MP58">MP58</option>
+                    <option value="MP59">MP59</option>
+                    <option value="MP60">MP60</option>
+                    <option value="MP61">MP61</option>
+                    <option value="MP62">MP62</option>
+                    <option value="MP63">MP63</option>
+                    <option value="MP64">MP64</option>
+                    <option value="MP65">MP65</option>
+                    <option value="MP66">MP66</option>
+                    <option value="MP67">MP67</option>
+                    <option value="MP68">MP68</option>
+                    <option value="MP69">MP69</option>
+                    <option value="MP70">MP70</option>
+                    <option value="MP71">MP71</option>
+                    <option value="MP72">MP72</option>
+                    <option value="MP73">MP73</option>
+                    <option value="MP74">MP74</option>
+                    <option value="MP75">MP75</option>
+                    <option value="MP76">MP76</option>
+                    <option value="MP77">MP77</option>
+                    <option value="MP80">MP80</option>
+                    <option value="MP81">MP81</option>
+                    <option value="MP82">MP82</option>
+                    </select> 
+                </td>
+                <td align="center">
+                <input type="text" id="txt14" name="txtcMPLat" value="" readonly size="10">
+                </td>
+                <td align="center">
+                <input type="text" id="txt15" name="txtcMPLon" value="" readonly size="10" >
+                </td>
+                <td align="center">
+                <input type="text" id="txt16" name="txtcMPHeight" value="" readonly size="10" >
+                </td>
+            </tr>
+            <tr>
+                <td align="center">
+                <select id="Opt4" name="OptionChooserd" onChange="MPChangedd" size="1">
+                    <option value="MPSelect">Select a MP</option>
+                    <option value="MP1">MP1</option>
+                    <option value="MP2">MP2</option>
+                    <option value="MP3">MP3</option>
+                    <option value="MP4">MP4</option>
+                    <option value="MP5">MP5</option>
+                    <option value="MP6">MP6</option>
+                    <option value="MP7">MP7</option>
+                    <option value="MP8">MP8</option>
+                    <option value="MP9">MP9</option>
+                    <option value="MP10">MP10</option>
+                    <option value="MP11">MP11</option>
+                    <option value="MP12">MP12</option>
+                    <option value="MP13">MP13</option>
+                    <option value="MP14">MP14</option>
+                    <option value="MP15">MP15</option>
+                    <option value="MP16">MP16</option>
+                    <option value="MP17">MP17</option>
+                    <option value="MP18">MP18</option>
+                    <option value="MP19">MP19</option>
+                    <option value="MP20">MP20</option>
+                    <option value="MP21">MP21</option>
+                    <option value="MP23">MP23</option>
+                    <option value="MP24">MP24</option>
+                    <option value="MP25">MP25</option>
+                    <option value="MP26">MP26</option>
+                    <option value="MP27">MP27</option>
+                    <option value="MP28">MP28</option>
+                    <option value="MP29">MP29</option>
+                    <option value="MP30">MP30</option>
+                    <option value="MP31">MP31</option>
+                    <option value="MP32">MP32</option>
+                    <option value="MP33">MP33</option>
+                    <option value="MP34">MP34</option>
+                    <option value="MP35">MP35</option>
+                    <option value="MP36">MP36</option>
+                    <option value="MP37">MP37</option>
+                    <option value="MP38">MP38</option>
+                    <option value="MP39">MP39</option>
+                    <option value="MP40">MP40</option>
+                    <option value="MP41">MP41</option>
+                    <option value="MP42">MP42</option>
+                    <option value="MP43">MP43</option>
+                    <option value="MP44">MP44</option>
+                    <option value="MP45">MP45</option>
+                    <option value="MP46">MP46</option>
+                    <option value="MP47">MP47</option>
+                    <option value="MP48">MP48</option>
+                    <option value="MP49">MP49</option>
+                    <option value="MP50">MP50</option>
+                    <option value="MP51">MP51</option>
+                    <option value="MP52">MP52</option>
+                    <option value="MP54">MP54</option>
+                    <option value="MP55">MP55</option>
+                    <option value="MP56">MP56</option>
+                    <option value="MP57">MP57</option>
+                    <option value="MP58">MP58</option>
+                    <option value="MP59">MP59</option>
+                    <option value="MP60">MP60</option>
+                    <option value="MP61">MP61</option>
+                    <option value="MP62">MP62</option>
+                    <option value="MP63">MP63</option>
+                    <option value="MP64">MP64</option>
+                    <option value="MP65">MP65</option>
+                    <option value="MP66">MP66</option>
+                    <option value="MP67">MP67</option>
+                    <option value="MP68">MP68</option>
+                    <option value="MP69">MP69</option>
+                    <option value="MP70">MP70</option>
+                    <option value="MP71">MP71</option>
+                    <option value="MP72">MP72</option>
+                    <option value="MP73">MP73</option>
+                    <option value="MP74">MP74</option>
+                    <option value="MP75">MP75</option>
+                    <option value="MP76">MP76</option>
+                    <option value="MP77">MP77</option>
+                    <option value="MP80">MP80</option>
+                    <option value="MP81">MP81</option>
+                    <option value="MP82">MP82</option>
+                    </select> 
+                </td>
+                <td align="center">
+                <input type="text" id="txt17" name="txtdMPLat" value="" readonly size="10">
+                </td>
+                <td align="center">
+                <input type="text" id="txt18" name="txtdMPLon" value="" readonly size="10" >
+                </td>
+                <td align="center">
+                <input type="text" id="txt19" name="txtdMPHeight" value="" readonly size="10" >
+                </td>
+            </tr>    
+            <tr>
+                <td align="left">
+                <input type="button" id="btn12" value="Save"  name="btnCoordsSave"  onClick="NewCoordsSave()" title="Save the coordinates to the KML file.111">
+                </td>
+                <td align="right" colspan="3">
+                <input type="button" id="btn13" value="Reset"  name="btnMPReset"  onClick="MPReset()" title="Reset the MonoPoles.">
+                </td>
+            </tr>
+            </table>
+            </fieldset>   
+        </div>
+
+        <div id="Tab3">
+            <fieldset>
+            <legend class="bfont">Going Home!</legend>
+            <table align="center">
+              <tr  align="center">
+                <td  align="center">
+                    <input type="button" id="btn14" value="Close Chrome"  name="btnKillChrome"  onClick="KillChrome()" title="Kill all Open Chrome Tabs.">          
+                </td>
+                <td  align="center">
+                    <input type="button" id="btn15" value="Close Edge"  name="btnKillEdge"  onClick="KillEdge()" title="Kill all Open Edge Tabs.">          
+                </td>
+                <td  align="center">
+                    <input type="button" id="btn16" value="Close Java"  name="btnKillJava"  onClick="KillJava()" title="Kill all Open Java Windows.">          
+                </td>  
+              </tr>        
+              <tr  align="center">
+                <td  align="center">
+                    <input type="button" id="btn17" value="Close GEarth"  name="btnKillGEarth"  onClick="KillGEarth()" title="Kill Google Earth.">          
+                </td>
+                <td  align="center">
+                    <input type="button" id="btn18" value="Close Excel"  name="btnKillExcel"  onClick="KillExcel()" title="Kill all Open MS Excel sheets.">          
+                </td>
+                <td  align="center">
+                    <input type="button" id="btn19" value="Close Snip"  name="btnKillSnip"  onClick="KillSnip()" title="Kill the Snipping Tool.">          
+                </td>
+              </tr>
+              <tr  align="center">
+                <td  align="center">
+                    <input type="button" id="btn20" value="Close Outlook"  name="btnKillOutlook"  onClick="KillOutlook()" title="Kill MS Outlook.">          
+                </td>
+                <td  align="center">
+                    <input type="button" id="btn21" value="Close Slack"  name="btnKillSlack"  onClick="KillSlack()" title="Kill Slack.">          
+                </td>
+                <td  align="center">
+                    <input type="button" id="btn22" value="Close Teams"  name="btnKillTeams"  onClick="KillTeams()" title="Kill Teams.">          
+                </td>  
+              </tr>
+              <tr align="center">
+                <td   colspan="3" align="center">
+                    <input type="button" id="btn23" value="Go Home"  name="btnGoHome"  onClick="GoHome()" title="Close everthing and reboot.">          
+                </td>
+              </tr>        
+            </table>
+            </fieldset>
+        </div>
+
+        <div id="Tab4">
+            <fieldset>
+              <legend class="bfont">MAC Address Conversion</legend>
+              <Table align=center>
+                <tr>
+                  <td align=center>
+                    <label for="txtLowerCase">Lower Case</label>
+                    <input type="text" id="txtLowerCase" name="txtLowerCase" value="" size="15" title="Put your lowercase text here.">
+                  </td>
+                  <td align=center>
+                    <label for="txtUpperCase">Upper Case</label>
+                    <input type="text" id="txtUpperCase" name="txtUpperCase" value="" size="15" readonly title="TADA! Your UpperCase MAC.">
+                  </td>
+                </tr>
+                <tr>
+                  <td colspan="3" align="center">
+                    <input type="button" id="btnPasteCopy" value="Paste/Copy" name="btnPasteCopy"  onClick="ToUpperCase()" title="Click this to paste, convert to upper, and then Copy a MAC address.">
+                  </td>
+                </tr>
+              </table>
+            </fieldset>
+            <fieldset>
+              <legend class="bfont">Phone Number Conversion</legend>
+              <Table align=center>
+                <tr>
+                  <td align=center>
+                    <label for="txtDirtyNumber">Dirty Number</label>
+                    <input type="text" id="txtDirtyNumber" name="txtDirtyNumber" value="" size="25" title="This is your unclean phone number">
+                  </td>
+                  <td align=center>
+                    <label for="txtUpperCase">Clean Number</label>
+                    <input type="text" id="txtCleanNumber" name="txtCleanNumber" value="" size="25" readonly title="TADA! Your clean phone number.">
+                  </td>
+                </tr>
+                <tr>
+                  <td colspan="3" align="center">
+                    <input type="button" id="btnPasteCopyPhone" value="Paste/Copy" name="btnPhonePasteCopy"  onClick="CleanNumber()" title="Click this to paste, clean the special characters, Copy the new one, Paste it into the Clean area, and Copy it into you Clipboard :).">
+                  </td>
+                </tr>
+              </table>
+            </fieldset>
+            <fieldset>
+              <legend class="bfont">IP Lookup Editing</legend>
+              <Table align=center>
+                <tr>
+                  <td colspan="4">Use this section to Add, Remove, or Change an IP in the IP lookup list.</td>
+                </tr>
+                <tr>
+                  <td align=left>
+                    <label for="txtNewMonopole">MP: </label>
+                    <input type="text" id="txtNewMP" name="txtNewMonopole" value="" size="5" title="Put a MonoPole or Tower number in here.">
+                  </td>
+                  <td align=left>
+                    <label for="txtNewLayer">Layer: </label>
+                    <input type="text" id="txtNewLayer" name="txtNewLayer" value="" size="5" title="Put the layer in here.">
+                  </td>
+                  <td align=left>
+                    <label for="txtNewSector">Sector: </label>
+                    <input type="text" id="txtNewSector" name="txtNewSector" value="" size="5" title="Put the sector number in here.">
+                  </td>
+                  <td align=left>
+                    <label for="txtNewIP">IP: </label>
+                    <input type="text" id="txtNewIP" name="txtNewIP" value="" size="17" title="Put the IP address in here">
+                  </td>                  
+                </tr>
+                <tr></tr>
+                <tr>
+                  <td align=center colspan="4">
+                    <input type="button" id="IPLUSearch" value="Search" name="btnIPLUSearch"  onClick="IPLUSearch()" title="Search the IP LookUp Range for either the MonoPole or IP information."> 
+                    &emsp;&emsp;
+                    <input type="button" id="IPLUAdd" value="Add" name="btnIPLUAdd"  onClick="IPLUAdd()" title="Add the above info to the IP LookUp Range."> 
+                    &emsp;&emsp;
+                    <input type="button" id="IPLUChange" value="Change" name="btnIPLUChange"  onClick="IPLUChange()" title="Change the above info in the IP LookUp Range.">          
+                    &emsp;&emsp;
+                    <input type="button" id="IPLURemove" value="Remove" name="btnIPLURemove"  onClick="IPLURemove()" title="Remove the above info from the IP LookUp Range.">          
+                  </td>      
+                </tr>
+              </table>
+            </fieldset>              
+        </div>
+    </div>
+</BODY>
+</HTML>
